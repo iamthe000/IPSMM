@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Infinity Pixel Storm: Monochrome Menace</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000; /* ボス戦の反転に備えて黒固定 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            color: white;
+            touch-action: none;
+        }
+        #gameContainer {
+            position: relative;
+            /* 通常時は青っぽく、ボス戦時は白っぽく光らせるための変数 */
+            --glow-color: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 20px var(--glow-color);
+            transition: box-shadow 0.5s;
+        }
+        canvas {
+            background-color: #000;
+            image-rendering: pixelated;
+            width: 100%;
+            height: 100vh;
+            max-width: 600px;
+            display: block;
+            /* ボス戦時に背景色を変えるためのトランジション */
+            transition: background-color 0.5s;
+        }
+        /* UI、メニュー類は前回と同じなので省略 */
+        #uiLayer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 10px; box-sizing: border-box;
+        }
+        .stat { font-size: 14px; text-shadow: 1px 1px 0 #000; font-weight: bold; }
+        #upgradeMenu, #startMenu, #gameOverMenu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            pointer-events: auto; z-index: 10; color: #fff;
+        }
+        .card {
+            background: #222; border: 2px solid #fff; padding: 15px; margin: 10px; width: 80%;
+            text-align: center; cursor: pointer; transition: transform 0.1s;
+        }
+        .card:hover { background: #444; transform: scale(1.05); }
+        .card h3 { margin: 0 0 5px 0; color: #ffeb3b; font-size: 16px; }
+        .card p { margin: 0; font-size: 12px; color: #ccc; }
+        h1 { font-size: 24px; color: #0ff; text-align: center; margin-bottom: 20px; }
+        button {
+            padding: 15px 30px; font-size: 18px; font-family: inherit;
+            background: #0ff; border: none; cursor: pointer; color: #000; font-weight: bold;
+        }
+        button:hover { background: #fff; }
+        .scanlines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px; pointer-events: none; z-index: 5;
+        }
+        /* ボス警告表示 */
+        #bossWarning {
+            position: absolute; top: 40%; width: 100%; text-align: center;
+            font-size: 30px; color: #f00; display: none; z-index: 8;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+            animation: blink 0.5s infinite alternate;
+        }
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.2; } }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="240" height="320"></canvas>
+    <div class="scanlines"></div>
+    <div id="bossWarning">WARNING!<br>BOSS APPROACHING</div>
+    
+    <div id="uiLayer">
+        <div class="stat" id="scoreDisplay">SCORE: 0</div>
+        <div class="stat" id="hpDisplay">HP: 100</div>
+        <div class="stat" style="text-align:center" id="bossTimerDisplay">NEXT BOSS: 60</div>
+    </div>
+
+    <div id="startMenu" style="display:flex;">
+        <h1>PIXEL STORM:<br>MONOCHROME MENACE</h1>
+        <p style="color:#aaa; font-size:12px; margin-bottom:20px;">DRAG TO MOVE / AUTO FIRE<br>WATCH OUT FOR CHARGERS!</p>
+        <button onclick="startGame()">START MISSION</button>
+    </div>
+
+    <div id="upgradeMenu">
+        <h2>LEVEL UP!</h2>
+        <div id="cardsContainer"></div>
+    </div>
+
+    <div id="gameOverMenu">
+        <h1 style="color:#f00">GAME OVER</h1>
+        <p id="finalScoreScore" style="margin-bottom:10px;">SCORE: 0</p>
+        <p id="finalScoreBoss" style="color:#aaa; margin-bottom:20px;">BOSS DEFEATED: 0</p>
+        <button onclick="resetGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+let gameState = 'start';
+let frameCount = 0;
+let score = 0;
+let gameTimeDifficulty = 0;
+
+// ボス戦関連の変数
+let isBossActive = false;
+let bossDefeatedCount = 0;
+let timeToNextBoss = 60 * 60; // 60秒 (60fps換算)
+let bossWarningTimer = 0;
+
+const input = { x: canvas.width / 2, y: canvas.height - 50 };
+const player = {
+    x: 120, y: 280, w: 8, h: 8,
+    hp: 100, maxHp: 100,
+    level: 1, xp: 0, nextLevelXp: 10,
+    bulletCount: 1, fireRate: 20, damage: 10,
+    speed: 5, bulletSize: 4, spread: 0.1, pierce: 0,
+    baseColor: '#0ff' // 元の色を保持
+};
+
+let bullets = [];
+let enemies = [];
+let particles = [];
+let xpGems = [];
+let enemyBullets = [];
+let stars = [];
+for(let i=0; i<50; i++) {
+    stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        speed: 0.5 + Math.random() * 2,
+        baseColor: Math.random() > 0.8 ? '#fff' : '#555'
+    });
+}
+
+const upgradePool = [
+    { name: "MULTI SHOT", desc: "弾数が+1増える", apply: () => { player.bulletCount++; player.spread += 0.05; } },
+    { name: "RAPID FIRE", desc: "連射速度UP", apply: () => { player.fireRate = Math.max(2, player.fireRate * 0.85); } }, // 連射上限設定
+    { name: "BIGGER BULLET", desc: "弾サイズと威力UP", apply: () => { player.bulletSize += 1.5; player.damage *= 1.4; } },
+    { name: "WIDE SPREAD", desc: "攻撃範囲が広がる", apply: () => { player.spread += 0.25; player.bulletCount++; } },
+    { name: "PIERCING", desc: "弾が敵を貫通する", apply: () => { player.pierce++; player.damage *= 0.9; } },
+    { name: "VIT UP", desc: "最大HP回復＆増加", apply: () => { player.maxHp += 50; player.hp = player.maxHp; } },
+    { name: "CHAOS BEAM", desc: "制御不能な高威力弾", apply: () => { player.damage *= 1.8; player.spread += 0.4; player.bulletCount += 2; } }
+];
+
+// --- 色調変換関数 ---
+// ボス戦中は強制的にグレー階調の色を返す
+function getColor(originalColor, type = 'normal') {
+    if (!isBossActive) return originalColor;
+
+    // タイプに応じてグレーの色味を変える
+    switch(type) {
+        case 'player': return '#fff'; // プレイヤーは白
+        case 'pBullet': return '#ccc'; // プレイヤー弾は明るいグレー
+        case 'enemy': return '#888';  // 敵は中間グレー
+        case 'boss': return '#fff';   // ボスは白（目立たせる）
+        case 'eBullet': return '#555'; // 敵弾は暗いグレー
+        case 'xp': return '#aaa';      // XPはやや明るいグレー
+        case 'bg': return '#222';      // 背景（星など）
+        case 'particle': return '#999';
+        default: return '#888';
+    }
+}
+
+function updateInputPosition(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    input.x = (clientX - rect.left) * (canvas.width / rect.width);
+    input.y = (clientY - rect.top) * (canvas.height / rect.height);
+}
+window.addEventListener('mousemove', e => { if(gameState === 'playing') updateInputPosition(e.clientX, e.clientY); });
+window.addEventListener('touchmove', e => { e.preventDefault(); if(gameState === 'playing') updateInputPosition(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+
+function startGame() {
+    document.getElementById('startMenu').style.display = 'none';
+    resetGameData();
+    gameState = 'playing';
+    loop();
+}
+function resetGame() {
+    document.getElementById('gameOverMenu').style.display = 'none';
+    resetGameData();
+    gameState = 'playing';
+}
+function resetGameData() {
+    player.x = canvas.width/2; player.y = canvas.height - 50;
+    player.hp = 100; player.maxHp = 100;
+    player.level = 1; player.xp = 0; player.nextLevelXp = 10;
+    player.bulletCount = 1; player.fireRate = 20;
+    player.damage = 10; player.bulletSize = 3; player.spread = 0.1; player.pierce = 0;
+    bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
+    score = 0; frameCount = 0; gameTimeDifficulty = 0;
+    // ボス関連リセット
+    isBossActive = false; bossDefeatedCount = 0; timeToNextBoss = 60 * 60; bossWarningTimer = 0;
+    resetBossEffects();
+    updateUI();
+}
+
+// ボス戦エフェクトの切り替え
+function setBossEffects(active) {
+    const container = document.getElementById('gameContainer');
+    const warning = document.getElementById('bossWarning');
+    if (active) {
+        canvas.style.backgroundColor = '#111'; // 少し明るい黒
+        container.style.setProperty('--glow-color', 'rgba(255, 255, 255, 0.3)');
+        warning.style.display = 'none'; // 警告は消す
+    } else {
+        canvas.style.backgroundColor = '#000';
+        container.style.setProperty('--glow-color', 'rgba(0, 255, 255, 0.2)');
+        warning.style.display = 'none';
+    }
+}
+function resetBossEffects() { setBossEffects(false); }
+
+
+function loop() {
+    if (gameState !== 'playing') return;
+    requestAnimationFrame(loop);
+    
+    // 背景色もボス戦かどうかで変える
+    ctx.fillStyle = isBossActive ? '#111' : '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    updateGameLogic();
+    drawGame();
+    
+    frameCount++;
+    if (frameCount % 60 === 0) gameTimeDifficulty++;
+}
+
+function updateGameLogic() {
+    player.x += (input.x - player.x) * 0.2;
+    player.y += (input.y - player.y) * 0.2;
+    player.x = Math.max(player.w, Math.min(canvas.width - player.w, player.x));
+    player.y = Math.max(player.h, Math.min(canvas.height - player.h, player.y));
+
+    stars.forEach(star => {
+        star.y += star.speed + (gameTimeDifficulty * 0.02);
+        if(star.y > canvas.height) { star.y = 0; star.x = Math.random() * canvas.width; }
+    });
+
+    if (frameCount % Math.floor(player.fireRate) === 0) spawnPlayerBullets();
+
+    // --- ボス出現管理 ---
+    if (!isBossActive) {
+        timeToNextBoss--;
+        if (timeToNextBoss <= 180 && timeToNextBoss > 0) { // 残り3秒で警告
+             document.getElementById('bossWarning').style.display = 'block';
+        }
+        if (timeToNextBoss <= 0) {
+            spawnBoss();
+        }
+        // ボスがいない時だけ雑魚スポーン
+        const spawnRate = Math.max(15, 60 - gameTimeDifficulty * 0.6);
+        if (frameCount % Math.floor(spawnRate) === 0) spawnEnemy();
+    }
+
+    updateEntities();
+    checkCollisions();
+    updateUI();
+    
+    if (player.hp <= 0) {
+        gameState = 'gameover';
+        document.getElementById('finalScoreScore').innerText = "SCORE: " + score;
+        document.getElementById('finalScoreBoss').innerText = "BOSS DEFEATED: " + bossDefeatedCount;
+        document.getElementById('gameOverMenu').style.display = 'flex';
+        resetBossEffects();
+    }
+}
+
+function drawGame() {
+    // getColorを使って色を決定する
+    stars.forEach(s => {
+        ctx.fillStyle = getColor(s.baseColor, 'bg');
+        ctx.fillRect(s.x, s.y, 1, 1);
+    });
+
+    // プレイヤー
+    ctx.fillStyle = getColor(player.baseColor, 'player');
+    ctx.fillRect(player.x - player.w/2, player.y - player.h/2, player.w, player.h);
+    // 残像はボス戦中は表示しない（視認性のため）
+    if (!isBossActive) {
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(player.x - player.w/2, player.y - player.h/2 + 5, player.w, player.h);
+        ctx.globalAlpha = 1.0;
+    }
+
+    // プレイヤー弾
+    ctx.fillStyle = getColor('#ffeb3b', 'pBullet');
+    bullets.forEach(b => ctx.fillRect(b.x - b.size/2, b.y - b.size/2, b.size, b.size));
+
+    // 敵弾
+    ctx.fillStyle = getColor('#f0f', 'eBullet');
+    enemyBullets.forEach(b => ctx.fillRect(b.x - 2, b.y - 2, 4, 4));
+
+    // 敵とボス
+    enemies.forEach(e => {
+        // ボスか雑魚かで色タイプを変える
+        const colorType = e.isBoss ? 'boss' : 'enemy';
+        let drawColor = getColor(e.baseColor, colorType);
+        
+        // 突撃準備中の敵は色を点滅させる (ボス戦以外)
+        if (!isBossActive && e.isCharger && e.chargeTimer > 0 && Math.floor(e.chargeTimer/10) % 2 === 0) {
+             drawColor = '#fff'; // 点滅色
+        }
+
+        ctx.fillStyle = drawColor;
+        ctx.fillRect(e.x - e.w/2, e.y - e.h/2, e.w, e.h);
+        
+        // 顔（ボス戦中は少し暗く）
+        ctx.fillStyle = isBossActive ? '#333' : '#000';
+        ctx.fillRect(e.x - e.w/4, e.y - e.h/4, e.w/8, e.h/8);
+        ctx.fillRect(e.x + e.w/8, e.y - e.h/4, e.w/8, e.h/8);
+    });
+
+    ctx.fillStyle = getColor('#0f0', 'xp');
+    xpGems.forEach(g => ctx.fillRect(g.x - 2, g.y - 2, 4, 4));
+
+    particles.forEach(p => {
+        ctx.fillStyle = getColor(p.baseColor, 'particle');
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+function updateEntities() {
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i]; b.x += b.vx; b.y += b.vy;
+        if (b.y < -50 || b.x < -50 || b.x > canvas.width + 50 || b.y > canvas.height + 50) bullets.splice(i, 1);
+    }
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        let b = enemyBullets[i]; b.x += b.vx; b.y += b.vy;
+        if (b.y > canvas.height + 10 || b.x < -10 || b.x > canvas.width + 10) enemyBullets.splice(i, 1);
+    }
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        
+        if (e.isBoss) {
+            // ボスの動き：ゆっくり降りてきて左右に動く
+            if (e.y < 60) e.y += 0.5;
+            e.x += Math.sin(frameCount * 0.02) * 2;
+            
+            // ボスの攻撃パターン（インフレする）
+            if (frameCount % e.fireRate === 0) {
+                // 放射状攻撃
+                const ways = 8 + bossDefeatedCount * 2;
+                for(let j=0; j<ways; j++) {
+                    let angle = (Math.PI * 2 / ways) * j + frameCount*0.01;
+                    enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*3, vy: Math.sin(angle)*3 });
+                }
+                // プレイヤー狙い撃ちも混ぜる
+                if (bossDefeatedCount > 1) {
+                     let angle = Math.atan2(player.y - e.y, player.x - e.x);
+                     enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*4, vy: Math.sin(angle)*4 });
+                }
+            }
+        } else if (e.isCharger) {
+            // 反射神経要素：突撃タイプの敵
+            if (e.chargeTimer > 0) {
+                e.chargeTimer--; // 溜め中
+                e.y += 0.5; // 少しずつ降りる
+            } else {
+                // 突撃開始！
+                e.y += e.speed * 5; // 通常の5倍速
+            }
+        } else {
+            // 通常の敵
+            e.y += e.speed;
+            e.x += Math.sin(frameCount * 0.05 + e.offset) * e.sway;
+            if (frameCount % e.fireRate === 0 && e.y < canvas.height - 50) {
+                let angle = Math.atan2(player.y - e.y, player.x - e.x);
+                enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2 });
+            }
+        }
+
+        if (e.y > canvas.height + 50) enemies.splice(i, 1);
+    }
+
+    for (let i = xpGems.length - 1; i >= 0; i--) {
+        let g = xpGems[i]; g.y += 1;
+        let dx = player.x - g.x, dy = player.y - g.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 50) { g.x += dx * 0.15; g.y += dy * 0.15; }
+        if (g.y > canvas.height) xpGems.splice(i, 1);
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+}
+
+function checkCollisions() {
+    bullets.forEach(b => {
+        enemies.forEach((e, eIdx) => {
+            if (!b.dead && rectIntersect(b.x, b.y, b.size, e.x, e.y, e.w, e.h)) {
+                e.hp -= player.damage;
+                // パーティクル色もgetColorで処理されるようにbaseColorを渡す
+                createParticles(e.x, e.y, isBossActive ? '#fff' : e.baseColor, 2);
+                if (b.pierce <= 0) b.dead = true; else b.pierce--;
+                if (e.hp <= 0) killEnemy(e, eIdx);
+            }
+        });
+    });
+    bullets = bullets.filter(b => !b.dead);
+
+    let hit = false;
+    enemies.forEach(e => { if (rectIntersect(player.x, player.y, 4, e.x, e.y, e.w, e.h)) hit = true; });
+    enemyBullets.forEach(b => { if (rectIntersect(player.x, player.y, 4, b.x, b.y, 4, 4)) { hit = true; b.y = 999; } });
+
+    if (hit) {
+        player.hp -= isBossActive ? 15 : 5; // ボス戦中は被ダメUP
+        createParticles(player.x, player.y, '#f00', 5);
+        if (player.hp < 0) player.hp = 0;
+    }
+
+    xpGems.forEach((g, i) => {
+        if (rectIntersect(player.x, player.y, 20, g.x, g.y, 4, 4)) {
+            addXp(g.val); xpGems.splice(i, 1);
+        }
+    });
+}
+
+// 中心座標での当たり判定に修正
+function rectIntersect(x1, y1, s1, x2, y2, w2, h2) {
+    return x2 - w2/2 < x1 + s1/2 && x2 + w2/2 > x1 - s1/2 &&
+           y2 - h2/2 < y1 + s1/2 && y2 + h2/2 > y1 - s1/2;
+}
+
+function spawnPlayerBullets() {
+    const count = player.bulletCount;
+    for (let i = 0; i < count; i++) {
+        let angleOffset = (i - (count - 1) / 2) * player.spread;
+        if (count > 30) angleOffset += (Math.random() - 0.5) * 0.5;
+        let angle = -Math.PI / 2 + angleOffset; 
+        bullets.push({
+            x: player.x, y: player.y,
+            vx: Math.cos(angle) * player.speed, vy: Math.sin(angle) * player.speed,
+            size: player.bulletSize, pierce: player.pierce, dead: false
+        });
+    }
+}
+
+// ボススポーン関数
+function spawnBoss() {
+    isBossActive = true;
+    setBossEffects(true);
+    // 既存の敵と弾を一掃
+    enemies = []; enemyBullets = [];
+
+    const difficultyMult = bossDefeatedCount + 1;
+    enemies.push({
+        x: canvas.width / 2, y: -50,
+        w: 60 + bossDefeatedCount * 5, h: 60 + bossDefeatedCount * 5,
+        hp: 1500 * difficultyMult,
+        fireRate: Math.max(10, 40 - bossDefeatedCount * 5),
+        baseColor: '#fff', // ボスは白ベース
+        isBoss: true
+    });
+}
+
+function spawnEnemy() {
+    const diff = 1 + (gameTimeDifficulty * 0.15);
+    // 10%の確率で「突撃タイプ（反射神経要素）」をスポーン
+    const isCharger = Math.random() < 0.1 + (gameTimeDifficulty * 0.005);
+    
+    enemies.push({
+        x: Math.random() * (canvas.width - 20) + 10, y: -20,
+        w: 16 + Math.random()*10, h: 16 + Math.random()*10,
+        hp: (isCharger ? 10 : 20) * diff, // 突撃タイプはHP低め
+        speed: 1 + Math.random() + (gameTimeDifficulty * 0.02),
+        sway: Math.random() * 2, offset: Math.random() * 100,
+        fireRate: Math.max(30, 120 - gameTimeDifficulty),
+        baseColor: isCharger ? '#f00' : `hsl(${Math.random()*360}, 70%, 50%)`,
+        isCharger: isCharger,
+        chargeTimer: isCharger ? 90 : 0 // 90フレーム(1.5秒)溜める
+    });
+}
+
+function killEnemy(e, index) {
+    if (enemies[index]) enemies.splice(index, 1);
+    
+    if (e.isBoss) {
+        // ボス撃破時処理
+        isBossActive = false;
+        bossDefeatedCount++;
+        timeToNextBoss = 60 * 60; // タイマーリセット
+        setBossEffects(false); // 色を戻す
+        // 大量のXP
+        for(let i=0; i<20; i++) xpGems.push({x: e.x+(Math.random()-0.5)*e.w, y: e.y+(Math.random()-0.5)*e.h, val: 50});
+        score += 5000 * (bossDefeatedCount + 1);
+        createParticles(e.x, e.y, '#fff', 50); // 派手な爆発
+    } else {
+        createParticles(e.x, e.y, isBossActive ? '#fff' : e.baseColor, 10);
+        score += 100;
+        xpGems.push({ x: e.x, y: e.y, val: 5 + (gameTimeDifficulty * 0.8) });
+    }
+}
+
+function createParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x: x, y: y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
+            life: 1.0, size: Math.random() * 3 + 1, baseColor: color
+        });
+    }
+}
+
+function addXp(amount) {
+    player.xp += amount;
+    if (player.xp >= player.nextLevelXp) {
+        player.xp -= player.nextLevelXp;
+        player.level++;
+        player.nextLevelXp = Math.floor(player.nextLevelXp * 1.25 + 20);
+        showUpgradeMenu();
+    }
+}
+
+function showUpgradeMenu() {
+    gameState = 'paused';
+    const menu = document.getElementById('upgradeMenu');
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = '';
+    menu.style.display = 'flex';
+    for(let i=0; i<3; i++) {
+        const upg = upgradePool[Math.floor(Math.random() * upgradePool.length)];
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<h3>${upg.name}</h3><p>${upg.desc}</p>`;
+        card.onclick = () => { upg.apply(); menu.style.display = 'none'; gameState = 'playing'; loop(); };
+        container.appendChild(card);
+    }
+}
+
+function updateUI() {
+    document.getElementById('scoreDisplay').innerText = `SCORE: ${score}`;
+    document.getElementById('hpDisplay').innerText = `HP: ${Math.floor(player.hp)}/${player.maxHp}`;
+    // ボスまでの残り時間を秒で表示
+    const secondsToBoss = Math.max(0, Math.ceil(timeToNextBoss / 60));
+    document.getElementById('bossTimerDisplay').innerText = isBossActive ? "BOSS FIGHT!" : `NEXT BOSS: ${secondsToBoss}`;
+    document.getElementById('bossTimerDisplay').style.color = (timeToNextBoss < 180 && !isBossActive) ? '#f00' : '#fff';
+}
+
+document.getElementById('startMenu').style.display = 'flex';
+</script>
+</body>
+</html>
