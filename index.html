@@ -125,6 +125,11 @@ let bossDefeatedCount = 0;
 let timeToNextBoss = 60 * 60; // 60秒 (60fps換算)
 let bossWarningTimer = 0;
 
+// 新しいエフェクト用の変数
+let screenShake = { magnitude: 0, duration: 0 };
+let hitStopTimer = 0;
+let shockwaves = [];
+
 const input = { x: canvas.width / 2, y: canvas.height - 50 };
 const player = {
     x: 120, y: 280, w: 8, h: 8,
@@ -232,13 +237,22 @@ function resetBossEffects() { setBossEffects(false); }
 function loop() {
     if (gameState !== 'playing') return;
     requestAnimationFrame(loop);
-    
+
+    ctx.save();
+    updateScreenShake();
+
     // 背景色もボス戦かどうかで変える
     ctx.fillStyle = isBossActive ? '#111' : '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    updateGameLogic();
+    if (hitStopTimer > 0) {
+        hitStopTimer--;
+    } else {
+        updateGameLogic();
+    }
     drawGame();
+    drawShockwaves();
+    ctx.restore();
     
     frameCount++;
     if (frameCount % 60 === 0) gameTimeDifficulty++;
@@ -327,6 +341,43 @@ function drawGame() {
         ctx.fillStyle = isBossActive ? '#333' : '#000';
         ctx.fillRect(e.x - e.w/4, e.y - e.h/4, e.w/8, e.h/8);
         ctx.fillRect(e.x + e.w/8, e.y - e.h/4, e.w/8, e.h/8);
+        
+        // --- タイミングコアの描画 ---
+        if (e.isBoss && e.timingCore.state !== 'inactive' && e.timingCore.state !== 'cooldown') {
+            const core = e.timingCore;
+            ctx.beginPath();
+            ctx.arc(core.x, core.y, core.radius, 0, Math.PI * 2);
+            if (core.state === 'active') {
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(frameCount*0.5)*0.5})`;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+            } else { // charging
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.strokeStyle = `rgba(255, 255, 255, ${Math.floor(frameCount/5)%2 ? 0.8 : 0.3})`;
+                ctx.lineWidth = 2;
+            }
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // --- レーザーの描画 ---
+        if (e.isBoss) {
+            if (e.laserState === 'aiming') {
+                ctx.beginPath();
+                ctx.moveTo(e.x, e.y);
+                ctx.lineTo(e.laserTargetX, e.laserTargetY);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${Math.floor(frameCount/3)%2 ? 0.5 : 0.2})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            } else if (e.laserState === 'firing') {
+                ctx.beginPath();
+                ctx.moveTo(e.x, e.y);
+                ctx.lineTo(e.laserTargetX, e.laserTargetY);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1 + Math.sin(e.laserTimer * 0.1) * 4;
+                ctx.stroke();
+            }
+        }
     });
 
     ctx.fillStyle = getColor('#0f0', 'xp');
@@ -357,7 +408,57 @@ function updateEntities() {
             // ボスの動き：ゆっくり降りてきて左右に動く
             if (e.y < 60) e.y += 0.5;
             e.x += Math.sin(frameCount * 0.02) * 2;
+
+            // --- タイミングコアのロジック ---
+            const core = e.timingCore;
+            core.timer--;
+            if (core.timer <= 0) {
+                switch (core.state) {
+                    case 'inactive':
+                        core.state = 'charging';
+                        core.timer = 120; // 2秒チャージ
+                        core.x = e.x + (Math.random() - 0.5) * e.w * 0.5;
+                        core.y = e.y + (Math.random() - 0.5) * e.h * 0.5;
+                        break;
+                    case 'charging':
+                        core.state = 'active';
+                        core.timer = 20; // 0.33秒の攻撃チャンス
+                        break;
+                    case 'active': // 時間切れ
+                        core.state = 'cooldown';
+                        core.timer = 180; // 3秒クールダウン
+                        // ペナルティ攻撃
+                        for(let j=0; j<12; j++) {
+                            let angle = Math.atan2(player.y - e.y, player.x - e.x) + (Math.random()-0.5)*0.5;
+                            enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*5, vy: Math.sin(angle)*5 });
+                        }
+                        break;
+                    case 'cooldown':
+                        core.state = 'inactive';
+                        core.timer = 120;
+                        break;
+                }
+            }
             
+            // --- レーザー攻撃のロジック ---
+            e.laserTimer--;
+            if (e.laserTimer <= 0 && e.laserState === 'idle') {
+                e.laserState = 'aiming';
+                e.laserTimer = 90; // 1.5秒エイミング
+                e.laserTargetX = player.x;
+                e.laserTargetY = player.y;
+            } else if (e.laserState === 'aiming') {
+                if (e.laserTimer <= 0) {
+                    e.laserState = 'firing';
+                    e.laserTimer = 120; // 2秒間発射
+                }
+            } else if (e.laserState === 'firing') {
+                if (e.laserTimer <= 0) {
+                    e.laserState = 'idle';
+                    e.laserTimer = 300; // 5秒クールダウン
+                }
+            }
+
             // ボスの攻撃パターン（インフレする）
             if (frameCount % e.fireRate === 0) {
                 // 放射状攻撃
@@ -421,7 +522,39 @@ function checkCollisions() {
     bullets = bullets.filter(b => !b.dead);
 
     let hit = false;
-    enemies.forEach(e => { if (rectIntersect(player.x, player.y, 4, e.x, e.y, e.w, e.h)) hit = true; });
+    enemies.forEach(e => {
+        if (rectIntersect(player.x, player.y, 4, e.x, e.y, e.w, e.h)) hit = true;
+        
+        // --- タイミングコアとの当たり判定 ---
+        if (e.isBoss && e.timingCore.state === 'active') {
+            const core = e.timingCore;
+            const dx = player.x - core.x;
+            const dy = player.y - core.y;
+            if (Math.sqrt(dx*dx + dy*dy) < player.w/2 + core.radius) {
+                // 成功！
+                e.hp -= 500 * (bossDefeatedCount + 1);
+                core.state = 'cooldown';
+                core.timer = 240; // 4秒の長めのクールダウン
+                triggerScreenShake(10, 30);
+                triggerHitStop(15);
+                triggerShockwave(core.x, core.y);
+                createParticles(core.x, core.y, '#fff', 30);
+                // 成功したのでペナルティ攻撃はなし
+            }
+        }
+        
+        // --- レーザーとの当たり判定 ---
+        if (e.isBoss && e.laserState === 'firing') {
+            // 点と線の距離で簡易的に判定
+            const A = e.laserTargetY - e.y;
+            const B = e.x - e.laserTargetX;
+            const C = -A * e.x - B * e.y;
+            const dist = Math.abs(A * player.x + B * player.y + C) / Math.sqrt(A * A + B * B);
+            if (dist < player.w/2 + 2) { // 2はレーザーの幅の半分（おおよそ）
+                hit = true;
+            }
+        }
+    });
     enemyBullets.forEach(b => { if (rectIntersect(player.x, player.y, 4, b.x, b.y, 4, 4)) { hit = true; b.y = 999; } });
 
     if (hit) {
@@ -468,10 +601,23 @@ function spawnBoss() {
     enemies.push({
         x: canvas.width / 2, y: -50,
         w: 60 + bossDefeatedCount * 5, h: 60 + bossDefeatedCount * 5,
-        hp: 1500 * difficultyMult,
+        hp: 2500 * difficultyMult,
         fireRate: Math.max(10, 40 - bossDefeatedCount * 5),
         baseColor: '#fff', // ボスは白ベース
-        isBoss: true
+        isBoss: true,
+
+       timingCore: {
+            state: 'inactive', // 'inactive', 'charging', 'active', 'cooldown'
+            timer: 180, // 次のアクションまでの時間
+            x: canvas.width / 2, // 初期位置
+            y: 100,
+            radius: 15
+        },
+        // レーザー攻撃用のプロパティ
+        laserState: 'idle', // 'idle', 'aiming', 'firing'
+        laserTimer: 240,
+        laserTargetX: 0,
+        laserTargetY: 0
     });
 }
 
@@ -545,6 +691,42 @@ function showUpgradeMenu() {
         card.innerHTML = `<h3>${upg.name}</h3><p>${upg.desc}</p>`;
         card.onclick = () => { upg.apply(); menu.style.display = 'none'; gameState = 'playing'; loop(); };
         container.appendChild(card);
+    }
+}
+
+// --- エフェクト関数群 ---
+function triggerScreenShake(magnitude, duration) {
+    screenShake.magnitude = magnitude;
+    screenShake.duration = duration;
+}
+function updateScreenShake() {
+    if (screenShake.duration > 0) {
+        screenShake.duration--;
+        const sx = (Math.random() - 0.5) * screenShake.magnitude;
+        const sy = (Math.random() - 0.5) * screenShake.magnitude;
+        ctx.translate(sx, sy);
+    }
+}
+function triggerHitStop(duration) {
+    hitStopTimer = duration;
+}
+function triggerShockwave(x, y) {
+    shockwaves.push({ x, y, radius: 0, alpha: 1 });
+}
+function drawShockwaves() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.radius += 4;
+        sw.alpha -= 0.025;
+        if (sw.alpha <= 0) {
+            shockwaves.splice(i, 1);
+        } else {
+            ctx.beginPath();
+            ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${sw.alpha})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
     }
 }
 
