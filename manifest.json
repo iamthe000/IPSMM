@@ -1,6 +1,6 @@
 {
-    "name": "IPS:MM",
-    "short_name": "InfinityPixelStorm:MonochromeMenace",
+    "name": "InfinityPixelStorm:MonochromeMenace",
+    "short_name": "IPS:MM",
     "start_url": "index.html",
     "display": "standalone",
     "icons": [
