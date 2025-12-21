@@ -483,7 +483,7 @@ function spawnEnemy() {
     enemies.push({
         x: Math.random() * (canvas.width - 20) + 10, y: -20,
         w: 16 + Math.random()*10, h: 16 + Math.random()*10,
-        hp: (isCharger ? 10 : 20) * diff, // 突撃タイプはHP低め
+        hp: (isCharger ? 5 : 10) * diff, // 突撃タイプはHP低め
         speed: 1 + Math.random() + (gameTimeDifficulty * 0.02),
         sway: Math.random() * 2, offset: Math.random() * 100,
         fireRate: Math.max(30, 120 - gameTimeDifficulty),
