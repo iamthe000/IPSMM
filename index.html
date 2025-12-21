@@ -389,6 +389,20 @@ function drawGame() {
         ctx.fillRect(p.x, p.y, p.size, p.size);
     });
     ctx.globalAlpha = 1.0;
+
+    // --- ボス戦時のビネットエフェクト ---
+    if (isBossActive) {
+        const vignetteStrength = 0.4 + Math.sin(frameCount * 0.03) * 0.3; // 0.1 to 0.7
+        const gradient = ctx.createRadialGradient(
+            canvas.width / 2, canvas.height / 2, canvas.width / 3, // inner circle
+            canvas.width / 2, canvas.height / 2, canvas.width / 1.2  // outer circle
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteStrength})`);
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 }
 
 function updateEntities() {
@@ -408,6 +422,21 @@ function updateEntities() {
             // ボスの動き：ゆっくり降りてきて左右に動く
             if (e.y < 60) e.y += 0.5;
             e.x += Math.sin(frameCount * 0.02) * 2;
+
+            // 新しいオーラエフェクト
+            if (frameCount % 4 === 0) { // 頻度を調整
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.max(e.w, e.h) / 1.5; // オーラの広がりを調整
+                particles.push({
+                    x: e.x + Math.cos(angle) * radius * (0.5 + Math.random() * 0.5), 
+                    y: e.y + Math.sin(angle) * radius * (0.5 + Math.random() * 0.5), 
+                    vx: (Math.random() - 0.5) * 0.5, // 動きは控えめに
+                    vy: (Math.random() - 0.5) * 0.5,
+                    life: 0.5, // 短命
+                    size: Math.random() * 2 + 1, 
+                    baseColor: '#fff'
+                });
+            }
 
             // --- タイミングコアのロジック ---
             const core = e.timingCore;
@@ -453,6 +482,13 @@ function updateEntities() {
                     e.laserTimer = 120; // 2秒間発射
                 }
             } else if (e.laserState === 'firing') {
+                // レーザー発射中にパーティクルを発生させて迫力を出す
+                const lerpAmount = Math.random();
+                createParticles(
+                    e.x + (e.laserTargetX - e.x) * lerpAmount,
+                    e.y + (e.laserTargetY - e.y) * lerpAmount,
+                    '#fff', 2
+                );
                 if (e.laserTimer <= 0) {
                     e.laserState = 'idle';
                     e.laserTimer = 300; // 5秒クールダウン
@@ -461,6 +497,7 @@ function updateEntities() {
 
             // ボスの攻撃パターン（インフレする）
             if (frameCount % e.fireRate === 0) {
+                createParticles(e.x, e.y, '#fff', 5); // 弾発射時にもエフェクト
                 // 放射状攻撃
                 const ways = 8 + bossDefeatedCount * 2;
                 for(let j=0; j<ways; j++) {
@@ -590,6 +627,24 @@ function spawnPlayerBullets() {
     }
 }
 
+// プレイヤーの総合的な強さを計算する関数
+function calculatePlayerPowerLevel() {
+    // DPS (Damage Per Second) を基準に計算
+    const bulletsPerSecond = 60 / player.fireRate;
+    const dps = player.damage * player.bulletCount * bulletsPerSecond;
+
+    // 貫通性能も加味
+    const pierceMultiplier = 1 + (player.pierce * 0.5);
+
+    // 生存性（HP）も少しだけ影響させる
+    const defensivePower = player.maxHp * 2;
+
+    const powerLevel = (dps * pierceMultiplier) + defensivePower;
+
+    // ゲームバランスのために数値を調整
+    return powerLevel / 150; 
+}
+
 // ボススポーン関数
 function spawnBoss() {
     isBossActive = true;
@@ -597,12 +652,19 @@ function spawnBoss() {
     // 既存の敵と弾を一掃
     enemies = []; enemyBullets = [];
 
-    const difficultyMult = bossDefeatedCount + 1;
+    const powerLevel = calculatePlayerPowerLevel();
+    // プレイヤーのパワーレベルに基づいてボスを強化
+    // 最低限の強さは保証しつつ、青天井に強くなるように調整
+    const hpMultiplier = 1 + (bossDefeatedCount * 0.5) + powerLevel;
+    const sizeMultiplier = 1 + (bossDefeatedCount * 0.1) + (powerLevel / 15);
+    const attackMultiplier = 1 + (bossDefeatedCount * 0.2) + (powerLevel / 10);
+
     enemies.push({
         x: canvas.width / 2, y: -50,
-        w: 60 + bossDefeatedCount * 5, h: 60 + bossDefeatedCount * 5,
-        hp: 2500 * difficultyMult,
-        fireRate: Math.max(10, 40 - bossDefeatedCount * 5),
+        w: Math.min(120, 50 * sizeMultiplier), // サイズ上限
+        h: Math.min(120, 50 * sizeMultiplier),
+        hp: 2000 * hpMultiplier,
+        fireRate: Math.max(5, 30 / attackMultiplier), // 連射速度上限
         baseColor: '#fff', // ボスは白ベース
         isBoss: true,
 
