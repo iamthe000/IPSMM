@@ -72,9 +72,10 @@
             position: absolute; top: 40%; width: 100%; text-align: center;
             font-size: 30px; color: #f00; display: none; z-index: 8;
             text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
-            animation: blink 0.5s infinite alternate;
+            animation: blink 0.3s infinite alternate;
+            transform: scale(1.2);
         }
-        @keyframes blink { from { opacity: 1; } to { opacity: 0.2; } }
+        @keyframes blink { from { opacity: 1; transform: scale(1.2); } to { opacity: 0.1; transform: scale(1.25); } }
     </style>
 </head>
 <body>
@@ -225,6 +226,7 @@ function setBossEffects(active) {
         canvas.style.backgroundColor = '#111'; // 少し明るい黒
         container.style.setProperty('--glow-color', 'rgba(255, 255, 255, 0.3)');
         warning.style.display = 'none'; // 警告は消す
+        triggerScreenShake(15, 60);
     } else {
         canvas.style.backgroundColor = '#000';
         container.style.setProperty('--glow-color', 'rgba(0, 255, 255, 0.2)');
@@ -298,12 +300,39 @@ function updateGameLogic() {
     }
 }
 
+function drawBossBackground() {
+    const gridSize = 20;
+    const speed = 0.5;
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    
+    // 描画負荷を少しでも下げるためにパスをまとめる
+    ctx.beginPath();
+    
+    const offsetX = (frameCount * speed) % gridSize;
+    for (let x = -offsetX; x < canvas.width; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+    }
+    
+    const offsetY = (frameCount * speed * 1.5) % gridSize;
+    for (let y = -offsetY; y < canvas.height; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+    }
+    ctx.stroke();
+}
+
 function drawGame() {
-    // getColorを使って色を決定する
-    stars.forEach(s => {
-        ctx.fillStyle = getColor(s.baseColor, 'bg');
-        ctx.fillRect(s.x, s.y, 1, 1);
-    });
+    // ボス戦かどうかで背景描画を切り替え
+    if (isBossActive) {
+        drawBossBackground();
+    } else {
+        stars.forEach(s => {
+            ctx.fillStyle = getColor(s.baseColor, 'bg');
+            ctx.fillRect(s.x, s.y, 1, 1);
+        });
+    }
 
     // プレイヤー
     ctx.fillStyle = getColor(player.baseColor, 'player');
@@ -370,11 +399,21 @@ function drawGame() {
                 ctx.lineWidth = 1;
                 ctx.stroke();
             } else if (e.laserState === 'firing') {
+                const dx = e.laserTargetX - e.x;
+                const dy = e.laserTargetY - e.y;
+                const len = Math.sqrt(dx*dx + dy*dy);
+                const endX = e.x + (dx/len) * 1000;
+                const endY = e.y + (dy/len) * 1000;
+
                 ctx.beginPath();
                 ctx.moveTo(e.x, e.y);
-                ctx.lineTo(e.laserTargetX, e.laserTargetY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 8 + Math.sin(e.laserTimer * 0.2) * 6;
+                ctx.stroke();
+                // さらに中心線を足してコアっぽさを出す
                 ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1 + Math.sin(e.laserTimer * 0.1) * 4;
+                ctx.lineWidth = 2;
                 ctx.stroke();
             }
         }
@@ -451,7 +490,7 @@ function updateEntities() {
                         break;
                     case 'charging':
                         core.state = 'active';
-                        core.timer = 20; // 0.33秒の攻撃チャンス
+                        core.timer = 35; // 約0.58秒の攻撃チャンス
                         break;
                     case 'active': // 時間切れ
                         core.state = 'cooldown';
@@ -469,6 +508,31 @@ function updateEntities() {
                 }
             }
             
+            // --- スパイラル攻撃のロジック ---
+            e.spiralAttack.timer--;
+            if (e.spiralAttack.timer <= 0 && !e.spiralAttack.active) {
+                e.spiralAttack.active = true;
+                e.spiralAttack.timer = 180; // 3秒間攻撃
+            }
+            if (e.spiralAttack.active) {
+                if (e.spiralAttack.timer <= 0) {
+                    e.spiralAttack.active = false;
+                    e.spiralAttack.timer = 400; // 6.6秒クールダウン
+                } else {
+                    if (frameCount % 3 === 0) {
+                       const speed = 2.5;
+                       for(let i = 0; i < 2; i++) { // 2方向に出す
+                           const angle = e.spiralAttack.angle + Math.PI * i;
+                           enemyBullets.push({ 
+                               x: e.x, y: e.y, 
+                               vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed 
+                           });
+                       }
+                       e.spiralAttack.angle += 0.2; // 少しずつ角度をずらす
+                    }
+                }
+            }
+
             // --- レーザー攻撃のロジック ---
             e.laserTimer--;
             if (e.laserTimer <= 0 && e.laserState === 'idle') {
@@ -655,7 +719,7 @@ function spawnBoss() {
     const powerLevel = calculatePlayerPowerLevel();
     // プレイヤーのパワーレベルに基づいてボスを強化
     // 最低限の強さは保証しつつ、青天井に強くなるように調整
-    const hpMultiplier = 1 + (bossDefeatedCount * 0.5) + powerLevel;
+    const hpMultiplier = 1 + (bossDefeatedCount * 0.4) + powerLevel * 0.8;
     const sizeMultiplier = 1 + (bossDefeatedCount * 0.1) + (powerLevel / 15);
     const attackMultiplier = 1 + (bossDefeatedCount * 0.2) + (powerLevel / 10);
 
@@ -679,7 +743,13 @@ function spawnBoss() {
         laserState: 'idle', // 'idle', 'aiming', 'firing'
         laserTimer: 240,
         laserTargetX: 0,
-        laserTargetY: 0
+        laserTargetY: 0,
+        // 新しいスパイラル攻撃用のプロパティ
+        spiralAttack: {
+            timer: 150, // 開始までの時間
+            angle: 0,
+            active: false
+        }
     });
 }
 
