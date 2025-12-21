@@ -106,7 +106,7 @@
         <h1 style="color:#f00">GAME OVER</h1>
         <p id="finalScoreScore" style="margin-bottom:10px;">SCORE: 0</p>
         <p id="finalScoreBoss" style="color:#aaa; margin-bottom:20px;">BOSS DEFEATED: 0</p>
-        <button onclick="resetGame()">RETRY</button>
+        <button onclick="resetGame()">RESTART</button>
     </div>
 </div>
 
@@ -727,7 +727,7 @@ function spawnBoss() {
         x: canvas.width / 2, y: -50,
         w: Math.min(120, 50 * sizeMultiplier), // サイズ上限
         h: Math.min(120, 50 * sizeMultiplier),
-        hp: 2000 * hpMultiplier,
+        hp: 1500 * hpMultiplier,
         fireRate: Math.max(5, 30 / attackMultiplier), // 連射速度上限
         baseColor: '#fff', // ボスは白ベース
         isBoss: true,
