@@ -155,6 +155,7 @@ let hitStopTimer = 0;
 let shockwaves = [];
 
 const input = { x: canvas.width / 2, y: canvas.height - 50 };
+const keys = { w: false, a: false, s: false, d: false };
 const player = {
     x: 120, y: 280, w: 8, h: 8,
     hp: 100, maxHp: 100,
@@ -215,6 +216,17 @@ function updateInputPosition(clientX, clientY) {
 }
 window.addEventListener('mousemove', e => { if(gameState === 'playing') updateInputPosition(e.clientX, e.clientY); });
 window.addEventListener('touchmove', e => { e.preventDefault(); if(gameState === 'playing') updateInputPosition(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+
+window.addEventListener('keydown', e => {
+    if (keys.hasOwnProperty(e.key.toLowerCase())) {
+        keys[e.key.toLowerCase()] = true;
+    }
+});
+window.addEventListener('keyup', e => {
+    if (keys.hasOwnProperty(e.key.toLowerCase())) {
+        keys[e.key.toLowerCase()] = false;
+    }
+});
 
 function startGame() {
     document.getElementById('startMenu').style.display = 'none';
@@ -292,6 +304,29 @@ function loop() {
 }
 
 function updateGameLogic() {
+    // Keyboard input
+    if (keys.w) input.y -= 5;
+    if (keys.a) input.x -= 5;
+    if (keys.s) input.y += 5;
+    if (keys.d) input.x += 5;
+
+    // Gamepad input
+    const gamepads = navigator.getGamepads();
+    if (gamepads[0]) {
+        const gamepad = gamepads[0];
+        const deadzone = 0.2;
+        if (Math.abs(gamepad.axes[0]) > deadzone) {
+            input.x += gamepad.axes[0] * 5;
+        }
+        if (Math.abs(gamepad.axes[1]) > deadzone) {
+            input.y += gamepad.axes[1] * 5;
+        }
+    }
+
+    // Clamp input to screen
+    input.x = Math.max(0, Math.min(canvas.width, input.x));
+    input.y = Math.max(0, Math.min(canvas.height, input.y));
+
     player.x += (input.x - player.x) * 0.2;
     player.y += (input.y - player.y) * 0.2;
     player.x = Math.max(player.w, Math.min(canvas.width - player.w, player.x));
