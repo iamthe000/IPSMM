@@ -102,6 +102,14 @@ if ('serviceWorker' in navigator) {
     <div id="startMenu" style="display:flex;">
         <h1>INFINITY PIXEL STORM<br>:MONOCHROME MENACE</h1>
         <p style="color:#aaa; font-size:12px; margin-bottom:20px;">DRAG TO MOVE / AUTO FIRE<br>WATCH OUT FOR CHARGERS!</p>
+        <div style="margin-bottom: 20px;">
+            <label for="bgmSelect" style="color: #aaa; font-size: 12px; margin-right: 10px;">BGM:</label>
+            <select id="bgmSelect" style="background: #333; color: white; border: 1px solid #555; padding: 5px;">
+                <option value="bgm1.mp3">あの先へ行こうか</option>
+                <option value="bgm2.mp3">トルコ行進曲</option>
+                <option value="IPS-Original.m4a">IPS Original</option>
+            </select>
+        </div>
         <button onclick="startGame()">START MISSION</button>
     </div>
 
@@ -122,6 +130,11 @@ if ('serviceWorker' in navigator) {
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+
+let bgm = new Audio();
+let bossBgm = new Audio('requiem.mp3');
+bgm.loop = true;
+bossBgm.loop = true;
 
 let gameState = 'start';
 let frameCount = 0;
@@ -202,6 +215,10 @@ window.addEventListener('mousemove', e => { if(gameState === 'playing') updateIn
 window.addEventListener('touchmove', e => { e.preventDefault(); if(gameState === 'playing') updateInputPosition(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
 
 function startGame() {
+    const bgmSelect = document.getElementById('bgmSelect');
+    bgm.src = bgmSelect.value;
+    bgm.play().catch(e => console.error("BGM play failed:", e));
+
     document.getElementById('startMenu').style.display = 'none';
     resetGameData();
     gameState = 'playing';
@@ -213,6 +230,9 @@ function resetGame() {
     gameState = 'playing';
 }
 function resetGameData() {
+    bgm.pause();
+    bossBgm.pause();
+
     player.x = canvas.width/2; player.y = canvas.height - 50;
     player.hp = 100; player.maxHp = 100;
     player.level = 1; player.xp = 0; player.nextLevelXp = 10;
@@ -721,6 +741,11 @@ function calculatePlayerPowerLevel() {
 function spawnBoss() {
     isBossActive = true;
     setBossEffects(true);
+    // BGM切り替え
+    bgm.volume = 0.2; // 通常BGMの音量を下げる
+    bossBgm.currentTime = 0;
+    bossBgm.play().catch(e => console.error("Boss BGM play failed:", e));
+
     // 既存の敵と弾を一掃
     enemies = []; enemyBullets = [];
 
@@ -784,6 +809,9 @@ function killEnemy(e, index) {
     
     if (e.isBoss) {
         // ボス撃破時処理
+        bossBgm.pause();
+        bgm.volume = 1.0; // 通常BGMの音量を戻す
+
         isBossActive = false;
         bossDefeatedCount++;
         timeToNextBoss = 60 * 60; // タイマーリセット
