@@ -106,7 +106,7 @@ if ('serviceWorker' in navigator) {
             <label for="bgmSelect" style="color: #aaa; font-size: 12px; margin-right: 10px;">BGM:</label>
             <select id="bgmSelect" style="background: #333; color: white; border: 1px solid #555; padding: 5px;">
                 <option value="bgm1.mp3">あの先へ行こうか</option>
-                <option value="bgm2.mp3">トルコ行進曲</option>
+                <option value="bgm2.ogg">トルコ行進曲</option>
                 <option value="IPS-Original.m4a">IPS Original</option>
             </select>
         </div>
@@ -132,7 +132,7 @@ const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 let bgm = new Audio();
-let bossBgm = new Audio('requiem.mp3');
+let bossBgm = new Audio('requiem.oga');
 bgm.loop = true;
 bossBgm.loop = true;
 
@@ -215,12 +215,13 @@ window.addEventListener('mousemove', e => { if(gameState === 'playing') updateIn
 window.addEventListener('touchmove', e => { e.preventDefault(); if(gameState === 'playing') updateInputPosition(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
 
 function startGame() {
+    document.getElementById('startMenu').style.display = 'none';
+    resetGameData();
+
     const bgmSelect = document.getElementById('bgmSelect');
     bgm.src = bgmSelect.value;
     bgm.play().catch(e => console.error("BGM play failed:", e));
 
-    document.getElementById('startMenu').style.display = 'none';
-    resetGameData();
     gameState = 'playing';
     loop();
 }
