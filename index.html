@@ -788,7 +788,7 @@ function spawnBoss() {
     isBossActive = true;
     setBossEffects(true);
     // BGM切り替え
-    bgm.volume = bgmVolume * 0.2; // 通常BGMの音量を下げる
+    bgm.pause();
     bossBgm.volume = bgmVolume;
     bossBgm.currentTime = 0;
     bossBgm.play().catch(e => console.error("Boss BGM play failed:", e));
@@ -799,7 +799,7 @@ function spawnBoss() {
     const powerLevel = calculatePlayerPowerLevel();
     // プレイヤーのパワーレベルに基づいてボスを強化
     // 最低限の強さは保証しつつ、青天井に強くなるように調整
-    const hpMultiplier = 1 + (bossDefeatedCount * 0.4) + powerLevel * 0.8;
+    const hpMultiplier = 1 + (bossDefeatedCount * 0.2) + powerLevel * 0.4;
     const sizeMultiplier = 1 + (bossDefeatedCount * 0.1) + (powerLevel / 15);
     const attackMultiplier = 1 + (bossDefeatedCount * 0.2) + (powerLevel / 10);
 
@@ -858,6 +858,7 @@ function killEnemy(e, index) {
         // ボス撃破時処理
         bossBgm.pause();
         bgm.volume = bgmVolume; // 通常BGMの音量を戻す
+        bgm.play();
 
         isBossActive = false;
         bossDefeatedCount++;
@@ -956,11 +957,7 @@ function updateUI() {
 
 document.getElementById('volumeSlider').addEventListener('input', e => {
     bgmVolume = parseFloat(e.target.value);
-    if (isBossActive) {
-        bgm.volume = bgmVolume * 0.2;
-    } else {
-        bgm.volume = bgmVolume;
-    }
+    bgm.volume = bgmVolume;
     bossBgm.volume = bgmVolume;
     document.getElementById('volumeValue').innerText = `${Math.round(bgmVolume * 100)}%`;
 });
