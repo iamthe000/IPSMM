@@ -110,6 +110,11 @@ if ('serviceWorker' in navigator) {
                 <option value="IPS-Original.m4a">IPS Original</option>
             </select>
         </div>
+        <div style="margin-bottom: 20px; width: 80%; text-align: center;">
+            <label for="volumeSlider" style="color: #aaa; font-size: 12px; margin-right: 10px;">VOLUME:</label>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.5" style="vertical-align: middle;">
+            <span id="volumeValue" style="color: #aaa; font-size: 12px;">50%</span>
+        </div>
         <button onclick="startGame()">START MISSION</button>
         <br>
         <button onclick="location.href='credit.html'">CREDIT</button>
@@ -137,6 +142,8 @@ let bgm = new Audio();
 let bossBgm = new Audio('requiem.oga');
 bgm.loop = true;
 bossBgm.loop = true;
+
+let bgmVolume = 0.5;
 
 let gameState = 'start';
 let frameCount = 0;
@@ -234,6 +241,7 @@ function startGame() {
 
     const bgmSelect = document.getElementById('bgmSelect');
     bgm.src = bgmSelect.value;
+    bgm.volume = bgmVolume;
     bgm.play().catch(e => console.error("BGM play failed:", e));
 
     gameState = 'playing';
@@ -780,7 +788,8 @@ function spawnBoss() {
     isBossActive = true;
     setBossEffects(true);
     // BGM切り替え
-    bgm.volume = 0.2; // 通常BGMの音量を下げる
+    bgm.volume = bgmVolume * 0.2; // 通常BGMの音量を下げる
+    bossBgm.volume = bgmVolume;
     bossBgm.currentTime = 0;
     bossBgm.play().catch(e => console.error("Boss BGM play failed:", e));
 
@@ -848,7 +857,7 @@ function killEnemy(e, index) {
     if (e.isBoss) {
         // ボス撃破時処理
         bossBgm.pause();
-        bgm.volume = 1.0; // 通常BGMの音量を戻す
+        bgm.volume = bgmVolume; // 通常BGMの音量を戻す
 
         isBossActive = false;
         bossDefeatedCount++;
@@ -944,6 +953,17 @@ function updateUI() {
     document.getElementById('bossTimerDisplay').innerText = isBossActive ? "BOSS FIGHT!" : `NEXT BOSS: ${secondsToBoss}`;
     document.getElementById('bossTimerDisplay').style.color = (timeToNextBoss < 180 && !isBossActive) ? '#f00' : '#fff';
 }
+
+document.getElementById('volumeSlider').addEventListener('input', e => {
+    bgmVolume = parseFloat(e.target.value);
+    if (isBossActive) {
+        bgm.volume = bgmVolume * 0.2;
+    } else {
+        bgm.volume = bgmVolume;
+    }
+    bossBgm.volume = bgmVolume;
+    document.getElementById('volumeValue').innerText = `${Math.round(bgmVolume * 100)}%`;
+});
 
 document.getElementById('startMenu').style.display = 'flex';
 </script>
