@@ -108,6 +108,7 @@ if ('serviceWorker' in navigator) {
                 <option value="bgm1.mp3">あの先へ行こうか</option>
                 <option value="bgm2.ogg">トルコ行進曲</option>
                 <option value="IPS-Original.m4a">IPS Original</option>
+                <option value="requiem.oga">Requiem</option>
             </select>
         </div>
         <div style="margin-bottom: 20px; width: 80%; text-align: center;">
@@ -139,9 +140,7 @@ const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 let bgm = new Audio();
-let bossBgm = new Audio('requiem.oga');
 bgm.loop = true;
-bossBgm.loop = true;
 
 let bgmVolume = 0.5;
 
@@ -254,7 +253,6 @@ function resetGame() {
 }
 function resetGameData() {
     bgm.pause();
-    bossBgm.pause();
 
     player.x = canvas.width/2; player.y = canvas.height - 50;
     player.hp = 100; player.maxHp = 100;
@@ -787,11 +785,6 @@ function calculatePlayerPowerLevel() {
 function spawnBoss() {
     isBossActive = true;
     setBossEffects(true);
-    // BGM切り替え
-    bgm.pause();
-    bossBgm.volume = bgmVolume;
-    bossBgm.currentTime = 0;
-    bossBgm.play().catch(e => console.error("Boss BGM play failed:", e));
 
     // 既存の敵と弾を一掃
     enemies = []; enemyBullets = [];
@@ -856,10 +849,6 @@ function killEnemy(e, index) {
     
     if (e.isBoss) {
         // ボス撃破時処理
-        bossBgm.pause();
-        bgm.volume = bgmVolume; // 通常BGMの音量を戻す
-        bgm.play();
-
         isBossActive = false;
         bossDefeatedCount++;
         timeToNextBoss = 60 * 60; // タイマーリセット
@@ -958,7 +947,6 @@ function updateUI() {
 document.getElementById('volumeSlider').addEventListener('input', e => {
     bgmVolume = parseFloat(e.target.value);
     bgm.volume = bgmVolume;
-    bossBgm.volume = bgmVolume;
     document.getElementById('volumeValue').innerText = `${Math.round(bgmVolume * 100)}%`;
 });
 
