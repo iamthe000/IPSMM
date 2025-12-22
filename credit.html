@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Credits | Infinity Pixel Storm</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: -1;
+            animation: move 10s linear infinite;
+        }
+
+        @keyframes move {
+            from { background-position: 0 0; }
+            to { background-position: 0 300px; }
+        }
+
+        .container {
+            max-width: 500px;
+            width: 90%;
+            padding: 40px;
+            border: 2px solid #0ff;
+            background: rgba(0, 0, 0, 0.8);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            position: relative;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #0ff;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px #0ff;
+            letter-spacing: 2px;
+        }
+
+        .credit-section {
+            margin-bottom: 30px;
+        }
+
+        .role {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .name {
+            font-size: 18px;
+            color: #fff;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .music-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .music-list li {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .music-sub {
+            font-size: 12px;
+            color: #aaa;
+            display: block;
+        }
+
+        button {
+            margin-top: 30px;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-family: inherit;
+            background: transparent;
+            border: 1px solid #0ff;
+            color: #0ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 15px #0ff;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0; left: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<div class="container">
+    <div class="scanline"></div>
+    <h1>STAFF CREDITS</h1>
+
+    <div class="credit-section">
+        <div class="role">Lead Developer / Designer</div>
+        <div class="name">mininium (iamthe000)</div>
+    </div>
+
+    <div class="credit-section">
+        <div class="role">Music Composers</div>
+        <ul class="music-list">
+            <li>KNATO</li>
+            <li>Ucchii0 <span class="music-sub">"あの先へ行こうか"</span></li>
+            <li>Ludwig van Beethoven</li>
+            <li>Wolfgang Amadeus Mozart</li>
+        </ul>
+    </div>
+
+    <div class="credit-section">
+        <div class="role">Special Thanks</div>
+        <div class="name">mininium (iamthe000)</div>
+    </div>
+
+    <button onclick="window.location.href='danmaku.html'">BACK TO MISSION</button>
+</div>
+
+</body>
+</html>
