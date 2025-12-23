@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial - Infinity Pixel Storm</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1+Code:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            font-family: 'M PLUS 1 Code', 'Courier New', monospace;
+            color: white;
+        }
+        .tutorial-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px 0;
+            box-sizing: border-box;
+        }
+        .tutorial-content {
+            width: 85%;
+            max-width: 600px;
+            text-align: left;
+            padding: 15px;
+            border: 1px solid #555;
+            background: #111;
+        }
+        .tutorial-content h2 { color: #0ff; }
+        .tutorial-content h3 { color: #ffeb3b; border-bottom: 1px solid #555; padding-bottom: 5px; }
+        .tutorial-content p { color: #ccc; line-height: 1.6; }
+
+        .button-link {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-family: inherit;
+            background: #0ff;
+            border: none;
+            cursor: pointer;
+            color: #000;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .button-link:hover {
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="tutorial-container">
+        <div class="tutorial-content">
+            <h2>TUTORIAL</h2>
+            
+            <h3>ゲームの基本</h3>
+            <p>
+                <strong>移動:</strong> マウスドラッグ、タッチ操作、WASDキー、またはゲームパッドで自機を操作します。<br>
+                <strong>攻撃:</strong> 攻撃は自動で行われます。<br>
+                <strong>目的:</strong> できるだけ長く生き残り、敵を倒してハイスコアを目指します。<br>
+                <strong>レベルアップ:</strong> 敵が落とす緑色のXPジェムを集めるとレベルアップし、強力なアップグレードを選択できます。
+            </p>
+
+            <h3>敵について</h3>
+            <p>
+                <strong>通常エネミー:</strong> ゆっくりと移動し、単発の弾を発射します。<br>
+                <strong>チャージャー (赤色):</strong> 短い溜めの後、高速で突撃してきます。素早く破壊しましょう！<br>
+                <strong>ボス:</strong> 60秒ごとに出現する強力な敵。多彩な攻撃パターンと高い体力を持ちます。倒すと高得点と大量のXPが得られます。
+            </p>
+
+            <h3>アップグレード (スキル)</h3>
+            <p>
+                <strong>MULTI SHOT:</strong> 一度に発射する弾の数が増えます。<br>
+                <strong>RAPID FIRE:</strong> 連射速度が向上します。<br>
+                <strong>BIGGER BULLET:</strong> 弾のサイズと威力が大きくなります。<br>
+                <strong>WIDE SPREAD:</strong> 攻撃範囲が広がり、より多くの敵を巻き込めます。<br>
+                <strong>PIERCING:</strong> 弾が敵を貫通するようになります。<br>
+                <strong>VIT UP:</strong> 最大HPが増加し、同時に全回復します。<br>
+                <strong>CHAOS BEAM:</strong> 制御は難しくなりますが、威力が大幅に向上するハイリスク・ハイリターンな強化です。
+            </p>
+        </div>
+        <a href="index.html" class="button-link">BACK</a>
+    </div>
+</body>
+</html>
