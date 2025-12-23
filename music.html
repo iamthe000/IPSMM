@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SOUND ROOM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1+Code:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'M PLUS 1 Code', 'Courier New', monospace;
+            color: white;
+            touch-action: none;
+        }
+        .container {
+            width: 90%;
+            max-width: 600px;
+            height: 90%;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #0ff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            font-size: 24px;
+            color: #0ff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-family: inherit;
+            background: #0ff;
+            border: none;
+            cursor: pointer;
+            color: #000;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #fff;
+        }
+        #musicList {
+            width: 100%;
+            height: calc(100% - 120px);
+            overflow-y: auto;
+            touch-action: auto;
+        }
+        .player {
+            border: 1px solid #555;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #1a1a1a;
+        }
+        .player-title {
+            font-weight: bold;
+            color: #ffeb3b;
+            margin-bottom: 10px;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .play-btn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            font-size: 20px;
+            background: #0ff;
+            border: none;
+            cursor: pointer;
+            color: #000;
+            margin: 0; /* Override button margin */
+        }
+        .time-display {
+            font-size: 12px;
+            min-width: 80px;
+            color: #ccc;
+        }
+        input[type="range"] {
+            flex-grow: 1;
+            height: 5px;
+            -webkit-appearance: none;
+            background: #555;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #0ff;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            background: #0ff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SOUND ROOM</h1>
+        <div id="musicList">
+            <!-- Music players will be inserted here -->
+        </div>
+        <button onclick="location.href='index.html'">BACK</button>
+    </div>
+
+<script>
+const musicListContainer = document.getElementById('musicList');
+const audioFiles = [
+    { src: 'bgm1.mp3', title: 'あの先へ行こうか' },
+    { src: 'bgm2.ogg', title: 'トルコ行進曲' },
+    { src: 'IPS-Original.m4a', title: 'IPS Original' },
+    { src: 'requiem.oga', title: 'Requiem' }
+];
+
+let currentlyPlaying = null;
+let allAudioElements = [];
+
+audioFiles.forEach((file) => {
+    const playerContainer = document.createElement('div');
+    playerContainer.className = 'player';
+
+    const title = document.createElement('div');
+    title.className = 'player-title';
+    title.textContent = file.title;
+    playerContainer.appendChild(title);
+
+    const controls = document.createElement('div');
+    controls.className = 'controls';
+
+    const playBtn = document.createElement('button');
+    playBtn.textContent = '▶';
+    playBtn.className = 'play-btn';
+
+    const timeDisplay = document.createElement('span');
+    timeDisplay.className = 'time-display';
+    timeDisplay.textContent = '0:00 / 0:00';
+
+    const seekBar = document.createElement('input');
+    seekBar.type = 'range';
+    seekBar.min = 0;
+    seekBar.value = 0;
+    seekBar.step = 1;
+
+    const volumeSlider = document.createElement('input');
+    volumeSlider.type = 'range';
+    volumeSlider.min = 0;
+    volumeSlider.max = 1;
+    volumeSlider.step = 0.01;
+    volumeSlider.value = 0.5;
+    volumeSlider.style.maxWidth = '100px';
+    volumeSlider.style.flexGrow = '0.3';
+
+    controls.appendChild(playBtn);
+    controls.appendChild(timeDisplay);
+    controls.appendChild(seekBar);
+    controls.appendChild(volumeSlider);
+    playerContainer.appendChild(controls);
+    musicListContainer.appendChild(playerContainer);
+
+    const audio = new Audio(file.src);
+    allAudioElements.push({audio: audio, playBtn: playBtn});
+
+    audio.addEventListener('loadedmetadata', () => {
+        seekBar.max = audio.duration;
+        timeDisplay.textContent = `0:00 / ${formatTime(audio.duration)}`;
+    });
+
+    audio.addEventListener('timeupdate', () => {
+        seekBar.value = audio.currentTime;
+        timeDisplay.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+    });
+
+    audio.addEventListener('ended', () => {
+        playBtn.textContent = '▶';
+        currentlyPlaying = null;
+    });
+
+    playBtn.addEventListener('click', () => {
+        if (audio.paused) {
+            // Pause any other playing audio
+            if (currentlyPlaying && currentlyPlaying !== audio) {
+                currentlyPlaying.pause();
+            }
+            allAudioElements.forEach(item => {
+                if(item.audio !== audio) item.playBtn.textContent = '▶';
+            });
+            audio.play();
+            playBtn.textContent = '❚❚';
+            currentlyPlaying = audio;
+        } else {
+            audio.pause();
+            playBtn.textContent = '▶';
+            currentlyPlaying = null;
+        }
+    });
+
+    seekBar.addEventListener('input', () => {
+        audio.currentTime = seekBar.value;
+    });
+
+    volumeSlider.addEventListener('input', () => {
+        audio.volume = volumeSlider.value;
+    });
+});
+
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return "0:00";
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+</script>
+</body>
+</html>
