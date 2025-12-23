@@ -135,44 +135,11 @@ if ('serviceWorker' in navigator) {
         </div>
         <button onclick="startGame()">START MISSION</button>
         <br>
-        <button onclick="showTutorial()">TUTORIAL</button>
+        <button onclick="location.href='tutorial.html'">TUTORIAL</button>
         <br>
         <button onclick="location.href='credit.html'">CREDIT</button>
     </div>
 
-    <div id="tutorialMenu">
-        <div class="tutorial-content">
-            <h2>TUTORIAL</h2>
-            
-            <h3>ゲームの基本</h3>
-            <p>
-                <strong>移動:</strong> マウスドラッグ、タッチ操作、WASDキー、またはゲームパッドで自機を操作します。<br>
-                <strong>攻撃:</strong> 攻撃は自動で行われます。<br>
-                <strong>目的:</strong> できるだけ長く生き残り、敵を倒してハイスコアを目指します。<br>
-                <strong>レベルアップ:</strong> 敵が落とす緑色のXPジェムを集めるとレベルアップし、強力なアップグレードを選択できます。
-            </p>
-
-            <h3>敵について</h3>
-            <p>
-                <strong>通常エネミー:</strong> ゆっくりと移動し、単発の弾を発射します。<br>
-                <strong>チャージャー (赤色):</strong> 短い溜めの後、高速で突撃してきます。素早く破壊しましょう！<br>
-                <strong>ボス:</strong> 60秒ごとに出現する強力な敵。多彩な攻撃パターンと高い体力を持ちます。倒すと高得点と大量のXPが得られます。
-            </p>
-
-            <h3>アップグレード (スキル)</h3>
-            <p>
-                <strong>MULTI SHOT:</strong> 一度に発射する弾の数が増えます。<br>
-                <strong>RAPID FIRE:</strong> 連射速度が向上します。<br>
-                <strong>BIGGER BULLET:</strong> 弾のサイズと威力が大きくなります。<br>
-                <strong>WIDE SPREAD:</strong> 攻撃範囲が広がり、より多くの敵を巻き込めます。<br>
-                <strong>PIERCING:</strong> 弾が敵を貫通するようになります。<br>
-                <strong>VIT UP:</strong> 最大HPが増加し、同時に全回復します。<br>
-                <strong>CHAOS BEAM:</strong> 制御は難しくなりますが、威力が大幅に向上するハイリスク・ハイリターンな強化です。
-            </p>
-        </div>
-        <br>
-        <button onclick="hideTutorial()">BACK</button>
-    </div>
 
     <div id="upgradeMenu">
         <h2>LEVEL UP!</h2>
@@ -287,17 +254,6 @@ window.addEventListener('keyup', e => {
     }
 });
 
-function showTutorial() {
-    document.getElementById('startMenu').style.display = 'none';
-    document.getElementById('tutorialMenu').style.display = 'flex';
-    document.body.style.touchAction = 'auto';
-}
-
-function hideTutorial() {
-    document.getElementById('tutorialMenu').style.display = 'none';
-    document.getElementById('startMenu').style.display = 'flex';
-    document.body.style.touchAction = 'none';
-}
 
 function startGame() {
     document.getElementById('startMenu').style.display = 'none';
