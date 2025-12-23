@@ -189,7 +189,8 @@ const player = {
     hp: 100, maxHp: 100,
     level: 1, xp: 0, nextLevelXp: 10,
     bulletCount: 1, fireRate: 20, damage: 10,
-    speed: 5, bulletSize: 4, spread: 0.1, pierce: 0,
+    bulletSpeed: 5, bulletSize: 4, spread: 0.1, pierce: 0,
+    agility: 0.2, xpGainMultiplier: 1.0, critChance: 0.05, critDamage: 1.5,
     baseColor: '#0ff' // 元の色を保持
 };
 
@@ -215,7 +216,12 @@ const upgradePool = [
     { name: "WIDE SPREAD", desc: "攻撃範囲が広がる", apply: () => { player.spread += 0.25; player.bulletCount++; } },
     { name: "PIERCING", desc: "弾が敵を貫通する", apply: () => { player.pierce++; player.damage *= 0.9; } },
     { name: "VIT UP", desc: "最大HP回復＆増加", apply: () => { player.maxHp += 50; player.hp = player.maxHp; } },
-    { name: "CHAOS BEAM", desc: "制御不能な高威力弾", apply: () => { player.damage *= 1.8; player.spread += 0.4; player.bulletCount += 2; } }
+    { name: "CHAOS BEAM", desc: "制御不能な高威力弾", apply: () => { player.damage *= 1.8; player.spread += 0.4; player.bulletCount += 2; } },
+    { name: "AGILITY UP", desc: "移動の追従性がUP", apply: () => { player.agility = Math.min(1.0, player.agility + 0.08); } },
+    { name: "BULLET SPEED UP", desc: "弾の速度がUP", apply: () => { player.bulletSpeed += 1.5; } },
+    { name: "LEARNING", desc: "取得経験値が15%UP", apply: () => { player.xpGainMultiplier += 0.15; } },
+    { name: "CRITICAL HIT", desc: "クリティカル率+5%", apply: () => { player.critChance += 0.05; } },
+    { name: "CRITICAL DAMAGE", desc: "クリティカルダメージ+50%", apply: () => { player.critDamage += 0.5; } }
 ];
 
 // --- 色調変換関数 ---
@@ -283,6 +289,7 @@ function resetGameData() {
     player.level = 1; player.xp = 0; player.nextLevelXp = 10;
     player.bulletCount = 1; player.fireRate = 20;
     player.damage = 15; player.bulletSize = 3; player.spread = 0.1; player.pierce = 0;
+    player.bulletSpeed = 5; player.agility = 0.2; player.xpGainMultiplier = 1.0; player.critChance = 0.05; player.critDamage = 1.5;
     bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
     score = 0; frameCount = 0; gameTimeDifficulty = 0;
     // ボス関連リセット
@@ -357,8 +364,8 @@ function updateGameLogic() {
     input.x = Math.max(0, Math.min(canvas.width, input.x));
     input.y = Math.max(0, Math.min(canvas.height, input.y));
 
-    player.x += (input.x - player.x) * 0.2;
-    player.y += (input.y - player.y) * 0.2;
+    player.x += (input.x - player.x) * player.agility;
+    player.y += (input.y - player.y) * player.agility;
     player.x = Math.max(player.w, Math.min(canvas.width - player.w, player.x));
     player.y = Math.max(player.h, Math.min(canvas.height - player.h, player.y));
 
@@ -708,9 +715,21 @@ function checkCollisions() {
     bullets.forEach(b => {
         enemies.forEach((e, eIdx) => {
             if (!b.dead && rectIntersect(b.x, b.y, b.size, e.x, e.y, e.w, e.h)) {
-                e.hp -= player.damage;
-                // パーティクル色もgetColorで処理されるようにbaseColorを渡す
-                createParticles(e.x, e.y, isBossActive ? '#fff' : e.baseColor, 2);
+                let finalDamage = player.damage;
+                let isCritical = false;
+                if (Math.random() < player.critChance) {
+                    finalDamage *= player.critDamage;
+                    isCritical = true;
+                }
+                e.hp -= finalDamage;
+
+                if (isCritical) {
+                    createParticles(e.x, e.y, '#ffeb3b', 15); // クリティカルヒットエフェクト
+                    triggerHitStop(3);
+                } else {
+                    createParticles(e.x, e.y, isBossActive ? '#fff' : e.baseColor, 2);
+                }
+                
                 if (b.pierce <= 0) b.dead = true; else b.pierce--;
                 if (e.hp <= 0) killEnemy(e, eIdx);
             }
@@ -781,7 +800,7 @@ function spawnPlayerBullets() {
         let angle = -Math.PI / 2 + angleOffset; 
         bullets.push({
             x: player.x, y: player.y,
-            vx: Math.cos(angle) * player.speed, vy: Math.sin(angle) * player.speed,
+            vx: Math.cos(angle) * player.bulletSpeed, vy: Math.sin(angle) * player.bulletSpeed,
             size: player.bulletSize, pierce: player.pierce, dead: false
         });
     }
@@ -898,7 +917,7 @@ function createParticles(x, y, color, count) {
 }
 
 function addXp(amount) {
-    player.xp += amount;
+    player.xp += amount * player.xpGainMultiplier;
     if (player.xp >= player.nextLevelXp) {
         player.xp -= player.nextLevelXp;
         player.level++;
