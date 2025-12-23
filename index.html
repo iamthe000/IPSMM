@@ -819,15 +819,23 @@ function spawnPlayerBullets() {
 function calculatePlayerPowerLevel() {
     // DPS (Damage Per Second) を基準に計算
     const bulletsPerSecond = 60 / player.fireRate;
-    const dps = player.damage * player.bulletCount * bulletsPerSecond;
+    // クリティカルヒットによるダメージ期待値を計算に含める
+    const critMultiplier = 1 + (player.critChance * (player.critDamage - 1));
+    const dps = player.damage * player.bulletCount * bulletsPerSecond * critMultiplier;
 
     // 貫通性能も加味
     const pierceMultiplier = 1 + (player.pierce * 0.5);
+    
+    // 弾速も攻撃性能として少し加味（速い弾は当たりやすい）
+    const bulletSpeedMultiplier = 1 + (player.bulletSpeed - 5) * 0.02; // 基準値5からの増加分を評価
 
-    // 生存性（HP）も少しだけ影響させる
-    const defensivePower = player.maxHp * 2;
+    const offensivePower = dps * pierceMultiplier * bulletSpeedMultiplier;
 
-    const powerLevel = (dps * pierceMultiplier) + defensivePower;
+    // 生存性（HPと回避能力）も影響させる
+    // Agilityの価値をHP換算で評価。基本値0.2で元の計算式とおおよそ同等になるように調整
+    const defensivePower = player.maxHp * (1.5 + player.agility * 2.5);
+
+    const powerLevel = offensivePower + defensivePower;
 
     // ゲームバランスのために数値を調整
     return powerLevel / 150; 
@@ -843,10 +851,10 @@ function spawnBoss() {
 
     const powerLevel = calculatePlayerPowerLevel();
     // プレイヤーのパワーレベルに基づいてボスを強化
-    // 最低限の強さは保証しつつ、青天井に強くなるように調整
-    const hpMultiplier = 1 + (bossDefeatedCount * 0.2) + powerLevel * 0.4;
-    const sizeMultiplier = 1 + (bossDefeatedCount * 0.1) + (powerLevel / 15);
-    const attackMultiplier = 1 + (bossDefeatedCount * 0.2) + (powerLevel / 10);
+    // 最低限の強さは保証しつつ、青天井に強くなるように調整. 係数を増やしてよりチャレンジングに
+    const hpMultiplier = 1 + (bossDefeatedCount * 0.2) + powerLevel * 0.6;
+    const sizeMultiplier = 1 + (bossDefeatedCount * 0.1) + (powerLevel / 10); // 15から10へ
+    const attackMultiplier = 1 + (bossDefeatedCount * 0.2) + (powerLevel / 7); // 10から7へ
 
     enemies.push({
         x: canvas.width / 2, y: -50,
