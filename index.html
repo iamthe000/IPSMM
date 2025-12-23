@@ -290,11 +290,13 @@ window.addEventListener('keyup', e => {
 function showTutorial() {
     document.getElementById('startMenu').style.display = 'none';
     document.getElementById('tutorialMenu').style.display = 'flex';
+    document.body.style.overflow = 'auto';
 }
 
 function hideTutorial() {
     document.getElementById('tutorialMenu').style.display = 'none';
     document.getElementById('startMenu').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
 }
 
 function startGame() {
