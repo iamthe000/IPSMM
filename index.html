@@ -132,6 +132,7 @@ if ('serviceWorker' in navigator) {
             <label for="volumeSlider" style="color: #aaa; font-size: 12px; margin-right: 10px;">VOLUME:</label>
             <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.5" style="vertical-align: middle;">
             <span id="volumeValue" style="color: #aaa; font-size: 12px;">50%</span>
+            <button id="muteButton" style="padding: 5px 10px; font-size: 12px; vertical-align: middle; margin-left: 10px;">MUTE</button>
         </div>
         <button onclick="startGame()">START MISSION</button>
         <br>
@@ -161,7 +162,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-let bgm = new Audio();
+var bgm = new Audio();
 bgm.loop = true;
 
 let bgmVolume = 0.5;
@@ -277,7 +278,15 @@ function startGame() {
 }
 function resetGame() {
     document.getElementById('gameOverMenu').style.display = 'none';
-    resetGameData();
+    resetGameData(); // 内部でbgm.pause()が呼ばれる
+
+    // BGMを再度選択して再生
+    const bgmSelect = document.getElementById('bgmSelect');
+    bgm.src = bgmSelect.value;
+    // updateVolumeを呼び出して音量とミュート状態を正しく適用する
+    updateVolume(bgmVolume, bgm.muted); 
+    bgm.play().catch(e => console.error("BGM play failed:", e));
+
     gameState = 'playing';
     loop();
 }
@@ -987,11 +996,37 @@ function updateUI() {
     document.getElementById('bossTimerDisplay').style.color = (timeToNextBoss < 180 && !isBossActive) ? '#f00' : '#fff';
 }
 
-document.getElementById('volumeSlider').addEventListener('input', e => {
-    bgmVolume = parseFloat(e.target.value);
+// --- 音量管理 ---
+const volumeSlider = document.getElementById('volumeSlider');
+const volumeValue = document.getElementById('volumeValue');
+const muteButton = document.getElementById('muteButton');
+
+function updateVolume(volume, muted) {
+    // グローバル変数と実際のaudioオブジェクトの両方を更新
+    bgmVolume = volume;
     bgm.volume = bgmVolume;
-    document.getElementById('volumeValue').innerText = `${Math.round(bgmVolume * 100)}%`;
+    bgm.muted = muted;
+
+    // UIの更新
+    volumeSlider.value = bgmVolume;
+    volumeValue.innerText = `${Math.round(bgmVolume * 100)}%`;
+    volumeSlider.disabled = bgm.muted;
+    muteButton.innerText = bgm.muted ? 'UNMUTE' : 'MUTE';
+}
+
+volumeSlider.addEventListener('input', e => {
+    // スライダーを動かしたらミュートは解除する
+    const newVolume = parseFloat(e.target.value);
+    updateVolume(newVolume, false);
 });
+
+muteButton.addEventListener('click', () => {
+    // ミュート状態をトグルする
+    updateVolume(bgmVolume, !bgm.muted);
+});
+
+// 初期UI状態を設定
+updateVolume(parseFloat(volumeSlider.value), false);
 
 document.getElementById('startMenu').style.display = 'flex';
 </script>
