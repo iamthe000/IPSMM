@@ -51,6 +51,18 @@
         .button-link:hover {
             background: #fff;
         }
+        .enemy-entry {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .enemy-canvas {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #444;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -67,11 +79,18 @@
             </p>
 
             <h3>敵について</h3>
-            <p>
-                <strong>通常エネミー:</strong> ゆっくりと移動し、単発の弾を発射します。<br>
-                <strong>チャージャー (赤色):</strong> 短い溜めの後、高速で突撃してきます。素早く破壊しましょう！<br>
-                <strong>ボス:</strong> 60秒ごとに出現する強力な敵。多彩な攻撃パターンと高い体力を持ちます。倒すと高得点と大量のXPが得られます。
-            </p>
+            <div class="enemy-entry">
+                <canvas id="normalEnemyCanvas" class="enemy-canvas" width="50" height="50"></canvas>
+                <p><strong>通常エネミー:</strong> ゆっくりと移動し、単発の弾を発射します。</p>
+            </div>
+            <div class="enemy-entry">
+                <canvas id="chargerEnemyCanvas" class="enemy-canvas" width="50" height="50"></canvas>
+                <p><strong>チャージャー (赤色):</strong> 短い溜めの後、高速で突撃してきます。素早く破壊しましょう！</p>
+            </div>
+            <div class="enemy-entry">
+                <canvas id="bossEnemyCanvas" class="enemy-canvas" width="50" height="50"></canvas>
+                <p><strong>ボス:</strong> 60秒ごとに出現する強力な敵。多彩な攻撃パターンと高い体力を持ちます。倒すと高得点と大量のXPが得られます。</p>
+            </div>
 
             <h3>アップグレード (スキル)</h3>
             <p>
@@ -86,5 +105,50 @@
         </div>
         <a href="index.html" class="button-link">BACK</a>
     </div>
+
+    <script>
+        function drawEnemy(canvasId, enemyType) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+
+            const w = 32; // Enemy base width
+            const h = 32; // Enemy base height
+            const x = canvas.width / 2;
+            const y = canvas.height / 2;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let baseColor;
+            switch (enemyType) {
+                case 'charger':
+                    baseColor = '#f00';
+                    break;
+                case 'boss':
+                    baseColor = '#fff';
+                    break;
+                case 'normal':
+                default:
+                    baseColor = `hsl(180, 70%, 50%)`;
+                    break;
+            }
+
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(x - w/2, y - h/2, w, h);
+
+            // Face
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x - w/4, y - h/4, w/8, h/8);
+            ctx.fillRect(x + w/8, y - h/4, w/8, h/8);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            drawEnemy('normalEnemyCanvas', 'normal');
+            drawEnemy('chargerEnemyCanvas', 'charger');
+            drawEnemy('bossEnemyCanvas', 'boss');
+        });
+    </script>
 </body>
 </html>
