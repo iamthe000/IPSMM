@@ -480,8 +480,8 @@ function drawGame() {
         
         // 顔（ボス戦中は少し暗く）
         ctx.fillStyle = isBossActive ? '#333' : '#000';
-        ctx.fillRect(e.x - e.w/4, e.y - e.h/4, e.w/8, e.h/8);
-        ctx.fillRect(e.x + e.w/8, e.y - e.h/4, e.w/8, e.h/8);
+        ctx.fillRect(e.x - e.w/5, e.y - e.h/4, e.w/12, e.h/4);
+        ctx.fillRect(e.x + e.w/12, e.y - e.h/4, e.w/12, e.h/4);
         
         // --- タイミングコアの描画 ---
         if (e.isBoss && e.timingCore.state !== 'inactive' && e.timingCore.state !== 'cooldown') {
