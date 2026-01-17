@@ -87,6 +87,14 @@ if ('serviceWorker' in navigator) {
         .card:hover { background: #444; transform: scale(1.05); }
         .card h3 { margin: 0 0 5px 0; color: #ffeb3b; font-size: 16px; }
         .card p { margin: 0; font-size: 12px; color: #ccc; }
+        .doctrine-card {
+            background: #222; border: 1px solid #fff; padding: 8px 4px; margin: 4px 0; width: 100%;
+            text-align: center; cursor: pointer; font-size: 9px; box-sizing: border-box;
+        }
+        .doctrine-card:hover { background: #444; }
+        .doctrine-card.active { border-color: #0ff; background: #004444; }
+        .doctrine-card h4 { margin: 0; color: #ffeb3b; font-size: 10px; }
+        .doctrine-card p { margin: 2px 0 0 0; color: #aaa; font-size: 8px; line-height: 1.1; }
         h1 { font-size: 24px; color: #0ff; text-align: center; margin-bottom: 20px; }
         button {
             padding: 15px 30px; font-size: 18px; font-family: inherit;
@@ -162,7 +170,12 @@ if ('serviceWorker' in navigator) {
 
     <div id="upgradeMenu">
         <h2>LEVEL UP!</h2>
-        <div id="cardsContainer"></div>
+        <div id="upgradeWrapper" style="display: flex; width: 100%; justify-content: center; align-items: flex-start;">
+            <div id="cardsContainer" style="flex: 1; display: flex; flex-direction: column; align-items: center;"></div>
+            <div id="doctrinesContainer" style="width: 100px; display: flex; flex-direction: column; align-items: center; border-left: 1px solid #555; padding: 10px;">
+                <div style="font-size: 10px; color: #0ff; margin-bottom: 5px;">DOCTRINES</div>
+            </div>
+        </div>
         <button id="rerollButton" style="margin-top: 20px;"></button>
     </div>
 
@@ -194,9 +207,9 @@ bgm.loop = true;
 let bgmVolume = 0.5;
 const rerollCost = 1000;
 
-let gameState = 'start';
-let frameCount = 0;
-let score = 0;
+var gameState = 'start';
+var frameCount = 0;
+var score = 0;
 let gameTimeDifficulty = 0;
 
 // ボス戦関連の変数
@@ -212,14 +225,16 @@ let shockwaves = [];
 
 const input = { x: canvas.width / 2, y: canvas.height - 50 };
 const keys = { w: false, a: false, s: false, d: false };
-const player = {
+var player = {
     x: 120, y: 280, w: 8, h: 8,
     hp: 100, maxHp: 100,
     level: 1, xp: 0, nextLevelXp: 10,
     bulletCount: 1, fireRate: 20, damage: 10,
     bulletSpeed: 5, bulletSize: 4, spread: 0.1, pierce: 0,
     agility: 0.2, xpGainMultiplier: 1.0, critChance: 0.05, critDamage: 1.5,
-    baseColor: '#0ff' // 元の色を保持
+    baseColor: '#0ff', // 元の色を保持
+    doctrine: null,
+    doctrineKillCount: 0
 };
 
 let bullets = [];
@@ -253,6 +268,14 @@ const upgradePool = [
     { name: "CRITICAL HIT", desc: "クリティカル率+5%", apply: () => { player.critChance += 0.05; } },
     { name: "CRITICAL DAMAGE", desc: "クリティカルダメージ+50%", apply: () => { player.critDamage += 0.5; } }
 ];
+
+const doctrinePool = [
+    { id: 'reflect', name: "REFLECT", desc: "自弾の画面枠での一回反射" },
+    { id: 'curve', name: "CURVE", desc: "自弾のカーブ" },
+    { id: 'shield', name: "SHIELD", desc: "時機の周りをまわる2つの盾" },
+    { id: 'heal', name: "HEAL", desc: "敵を5体倒したら負のHPの半分を回復" }
+];
+const doctrineCost = 1000;
 
 // --- 色調変換関数 ---
 // ボス戦中は強制的にグレー階調の色を返す
@@ -378,6 +401,7 @@ function resetGameData() {
     player.bulletCount = 1; player.fireRate = 20;
     player.damage = 15; player.bulletSize = 3; player.spread = 0.1; player.pierce = 0;
     player.bulletSpeed = 5; player.agility = 0.2; player.xpGainMultiplier = 1.0; player.critChance = 0.05; player.critDamage = 1.5;
+    player.doctrine = null; player.doctrineKillCount = 0;
     bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
     score = 0; frameCount = 0; gameTimeDifficulty = 0;
     // ボス関連リセット
@@ -538,6 +562,17 @@ function drawGame() {
     // プレイヤー
     ctx.fillStyle = getColor(player.baseColor, 'player');
     ctx.fillRect(player.x - player.w/2, player.y - player.h/2, player.w, player.h);
+
+    if (player.doctrine === 'shield') {
+        const shieldCount = 2;
+        for (let i = 0; i < shieldCount; i++) {
+            const angle = (frameCount * 0.05) + (i * Math.PI * 2 / shieldCount);
+            const sx = player.x + Math.cos(angle) * 30;
+            const sy = player.y + Math.sin(angle) * 30;
+            ctx.fillStyle = getColor('#0ff', 'player');
+            ctx.fillRect(sx - 4, sy - 4, 8, 8);
+        }
+    }
     // 残像はボス戦中は表示しない（視認性のため）
     if (!isBossActive) {
         ctx.globalAlpha = 0.3;
@@ -685,7 +720,25 @@ function drawGame() {
 
 function updateEntities() {
     for (let i = bullets.length - 1; i >= 0; i--) {
-        let b = bullets[i]; b.x += b.vx; b.y += b.vy;
+        let b = bullets[i];
+        
+        if (player.doctrine === 'curve') {
+            const angle = 0.04;
+            const nx = b.vx * Math.cos(angle) - b.vy * Math.sin(angle);
+            const ny = b.vx * Math.sin(angle) + b.vy * Math.cos(angle);
+            b.vx = nx; b.vy = ny;
+        }
+
+        b.x += b.vx; b.y += b.vy;
+
+        if (player.doctrine === 'reflect' && !b.reflected) {
+            if (b.x < 0 || b.x > canvas.width) {
+                b.vx *= -1; b.reflected = true;
+            } else if (b.y < 0 || b.y > canvas.height) {
+                b.vy *= -1; b.reflected = true;
+            }
+        }
+
         if (b.y < -50 || b.x < -50 || b.x > canvas.width + 50 || b.y > canvas.height + 50) bullets.splice(i, 1);
     }
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
@@ -896,8 +949,21 @@ function checkCollisions() {
     bullets = bullets.filter(b => !b.dead);
 
     let hit = false;
-    enemies.forEach(e => {
+    enemies.forEach((e, eIdx) => {
         if (rectIntersect(player.x, player.y, 4, e.x, e.y, e.w, e.h)) hit = true;
+
+        if (player.doctrine === 'shield') {
+            const shieldCount = 2;
+            for (let i = 0; i < shieldCount; i++) {
+                const angle = (frameCount * 0.05) + (i * Math.PI * 2 / shieldCount);
+                const sx = player.x + Math.cos(angle) * 30;
+                const sy = player.y + Math.sin(angle) * 30;
+                if (rectIntersect(sx, sy, 8, e.x, e.y, e.w, e.h)) {
+                    e.hp -= player.damage * 0.1;
+                    if (e.hp <= 0) killEnemy(e, eIdx);
+                }
+            }
+        }
         
         // --- タイミングコアとの当たり判定 ---
         if (e.isBoss && e.timingCore.state === 'active') {
@@ -929,7 +995,31 @@ function checkCollisions() {
             }
         }
     });
-    enemyBullets.forEach(b => { if (rectIntersect(player.x, player.y, 4, b.x, b.y, 4, 4)) { hit = true; b.y = 999; } });
+    for (let j = enemyBullets.length - 1; j >= 0; j--) {
+        const b = enemyBullets[j];
+        if (rectIntersect(player.x, player.y, 4, b.x, b.y, 4, 4)) {
+            hit = true;
+            enemyBullets.splice(j, 1);
+            continue;
+        }
+
+        if (player.doctrine === 'shield') {
+            const shieldCount = 2;
+            let shielded = false;
+            for (let i = 0; i < shieldCount; i++) {
+                const angle = (frameCount * 0.05) + (i * Math.PI * 2 / shieldCount);
+                const sx = player.x + Math.cos(angle) * 30;
+                const sy = player.y + Math.sin(angle) * 30;
+                if (rectIntersect(sx, sy, 8, b.x, b.y, 4, 4)) {
+                    enemyBullets.splice(j, 1);
+                    createParticles(sx, sy, '#fff', 2);
+                    shielded = true;
+                    break;
+                }
+            }
+            if (shielded) continue;
+        }
+    }
 
     if (hit) {
         player.hp -= isBossActive ? 15 : 5; // ボス戦中は被ダメUP
@@ -959,7 +1049,8 @@ function spawnPlayerBullets() {
         bullets.push({
             x: player.x, y: player.y,
             vx: Math.cos(angle) * player.bulletSpeed, vy: Math.sin(angle) * player.bulletSpeed,
-            size: player.bulletSize, pierce: player.pierce, dead: false
+            size: player.bulletSize, pierce: player.pierce, dead: false,
+            reflected: false
         });
     }
 }
@@ -1064,6 +1155,21 @@ function spawnEnemy() {
 function killEnemy(e, index) {
     if (enemies[index]) enemies.splice(index, 1);
     
+    if (player.doctrine === 'heal') {
+        player.doctrineKillCount++;
+        if (player.doctrineKillCount >= 5) {
+            player.doctrineKillCount = 0;
+            const healAmount = (player.maxHp - player.hp) / 2;
+            player.hp += healAmount;
+            createParticles(player.x, player.y, '#0f0', 15);
+            particles.push({
+                x: player.x, y: player.y - 20,
+                vx: 0, vy: -1,
+                life: 1.0, size: 0, baseColor: '#0f0', isText: true, text: 'HEAL!'
+            });
+        }
+    }
+
     if (e.isBoss) {
         // ボス撃破時処理
         isBossActive = false;
@@ -1106,6 +1212,7 @@ function showUpgradeMenu() {
     const container = document.getElementById('cardsContainer');
     container.innerHTML = '';
     menu.style.display = 'flex';
+    updateDoctrinesUI();
 
     // Pick 3 unique upgrades
     const pool = [...upgradePool];
@@ -1146,6 +1253,32 @@ function resumeGame() {
     gameState = 'playing';
     document.getElementById('pauseMenu').style.display = 'none';
     loop();
+}
+
+function updateDoctrinesUI() {
+    const container = document.getElementById('doctrinesContainer');
+    container.innerHTML = '<div style="font-size: 10px; color: #0ff; margin-bottom: 5px;">DOCTRINES</div>';
+    
+    doctrinePool.forEach(doc => {
+        const div = document.createElement('div');
+        div.className = 'doctrine-card' + (player.doctrine === doc.id ? ' active' : '');
+        div.innerHTML = `<h4>${doc.name}</h4><p>${doc.desc}</p><div style="color: #ffeb3b; font-size: 8px; margin-top: 2px;">${doctrineCost}</div>`;
+        div.onclick = (e) => {
+            e.stopPropagation();
+            buyDoctrine(doc.id);
+        };
+        container.appendChild(div);
+    });
+}
+
+function buyDoctrine(id) {
+    if (score >= doctrineCost) {
+        score -= doctrineCost;
+        player.doctrine = id;
+        player.doctrineKillCount = 0;
+        updateUI();
+        updateDoctrinesUI();
+    }
 }
 
 // --- エフェクト関数群 ---
