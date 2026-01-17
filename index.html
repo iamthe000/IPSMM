@@ -200,6 +200,8 @@ let enemies = [];
 let particles = [];
 let xpGems = [];
 let enemyBullets = [];
+let slashes = [];
+let screenInvertTimer = 0;
 let stars = [];
 for(let i=0; i<50; i++) {
     stars.push({
@@ -251,6 +253,52 @@ function updateInputPosition(clientX, clientY) {
 }
 window.addEventListener('mousemove', e => { if(gameState === 'playing') updateInputPosition(e.clientX, e.clientY); });
 window.addEventListener('touchmove', e => { e.preventDefault(); if(gameState === 'playing') updateInputPosition(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+
+function handleTap(clientX, clientY) {
+    if (gameState !== 'playing') return;
+    
+    enemies.forEach(e => {
+        if (e.isBoss && e.quickTap && e.quickTap.state === 'active') {
+            const qte = e.quickTap;
+            e.hp -= 800 * (bossDefeatedCount + 1);
+            qte.state = 'cooldown';
+            qte.timer = 180 + Math.random() * 120;
+            
+            triggerScreenShake(20, 30);
+            triggerHitStop(10);
+            screenInvertTimer = 8;
+            
+            const angle1 = Math.random() * Math.PI;
+            const dist = 60;
+            triggerSlash(
+                e.x - Math.cos(angle1) * dist, e.y - Math.sin(angle1) * dist,
+                e.x + Math.cos(angle1) * dist, e.y + Math.sin(angle1) * dist
+            );
+            const angle2 = angle1 + Math.PI/2 + (Math.random()-0.5);
+            triggerSlash(
+                e.x - Math.cos(angle2) * dist, e.y - Math.sin(angle2) * dist,
+                e.x + Math.cos(angle2) * dist, e.y + Math.sin(angle2) * dist
+            );
+            
+            createParticles(e.x, e.y, '#fff', 30);
+            
+            for(let i=0; i<3; i++) {
+                particles.push({
+                    x: e.x + (Math.random()-0.5)*40, y: e.y + (Math.random()-0.5)*40,
+                    vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2,
+                    life: 1.0, size: 0, baseColor: '#fff', isText: true, text: 'SLASH!'
+                });
+            }
+        }
+    });
+}
+
+window.addEventListener('mousedown', e => {
+    handleTap(e.clientX, e.clientY);
+});
+window.addEventListener('touchstart', e => {
+    handleTap(e.touches[0].clientX, e.touches[0].clientY);
+});
 
 window.addEventListener('keydown', e => {
     if (keys.hasOwnProperty(e.key.toLowerCase())) {
@@ -343,6 +391,16 @@ function loop() {
     }
     drawGame();
     drawShockwaves();
+    
+    // 画面反転演出 (描画の最後に適用)
+    if (screenInvertTimer > 0) {
+        ctx.globalCompositeOperation = 'difference';
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-50, -50, canvas.width + 100, canvas.height + 100);
+        ctx.globalCompositeOperation = 'source-over';
+        screenInvertTimer--;
+    }
+
     ctx.restore();
     
     frameCount++;
@@ -535,11 +593,49 @@ function drawGame() {
     xpGems.forEach(g => ctx.fillRect(g.x - 2, g.y - 2, 4, 4));
 
     particles.forEach(p => {
-        ctx.fillStyle = getColor(p.baseColor, 'particle');
         ctx.globalAlpha = p.life;
-        ctx.fillRect(p.x, p.y, p.size, p.size);
+        if (p.isText) {
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px "M PLUS 1 Code"';
+            ctx.fillText(p.text, p.x, p.y);
+        } else {
+            ctx.fillStyle = getColor(p.baseColor, 'particle');
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        }
     });
     ctx.globalAlpha = 1.0;
+
+    // --- スラッシュエフェクトの描画 ---
+    for (let i = slashes.length - 1; i >= 0; i--) {
+        const s = slashes[i];
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 4 * s.life;
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        ctx.stroke();
+        s.life -= 0.05;
+        if (s.life <= 0) slashes.splice(i, 1);
+    }
+
+    // --- Quick Tap (QTE) UIの描画 ---
+    enemies.forEach(e => {
+        if (e.isBoss && e.quickTap && e.quickTap.state === 'active') {
+            const qte = e.quickTap;
+            const progress = qte.timer / 100; // 1.0 -> 0
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(qte.x, qte.y, 10 + progress * 40, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px "M PLUS 1 Code"';
+            ctx.textAlign = 'center';
+            ctx.fillText('TAP!', qte.x, qte.y + 6);
+        }
+    });
 
     // --- ボス戦時のビネットエフェクト ---
     if (isBossActive) {
@@ -587,6 +683,28 @@ function updateEntities() {
                     size: Math.random() * 2 + 1, 
                     baseColor: '#fff'
                 });
+            }
+
+            // --- Quick Tap (QTE) Logic ---
+            const qte = e.quickTap;
+            if (qte) {
+                qte.timer--;
+                if (qte.timer <= 0) {
+                    if (qte.state === 'inactive') {
+                        qte.state = 'active';
+                        qte.timer = 100; // 約1.6秒の猶予
+                        qte.x = 40 + Math.random() * (canvas.width - 80);
+                        qte.y = 80 + Math.random() * (canvas.height - 160);
+                    } else if (qte.state === 'active') {
+                        // 時間切れ
+                        qte.state = 'cooldown';
+                        qte.timer = 240 + Math.random() * 240;
+                    } else {
+                        // クールダウン終了
+                        qte.state = 'inactive';
+                        qte.timer = 180 + Math.random() * 180;
+                    }
+                }
             }
 
             // --- タイミングコアのロジック ---
@@ -882,6 +1000,14 @@ function spawnBoss() {
             timer: 150, // 開始までの時間
             angle: 0,
             active: false
+        },
+        // Quick Tap (QTE) 用のプロパティ
+        quickTap: {
+            state: 'inactive', // 'inactive', 'active', 'cooldown'
+            timer: 300 + Math.random() * 300,
+            x: 0,
+            y: 0,
+            radius: 40
         }
     });
 }
@@ -977,6 +1103,9 @@ function triggerHitStop(duration) {
 }
 function triggerShockwave(x, y) {
     shockwaves.push({ x, y, radius: 0, alpha: 1 });
+}
+function triggerSlash(x1, y1, x2, y2) {
+    slashes.push({ x1, y1, x2, y2, life: 1.0 });
 }
 function drawShockwaves() {
     for (let i = shockwaves.length - 1; i >= 0; i--) {
