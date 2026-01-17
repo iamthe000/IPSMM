@@ -54,7 +54,13 @@ if ('serviceWorker' in navigator) {
             padding: 10px; box-sizing: border-box;
         }
         .stat { font-size: 14px; text-shadow: 1px 1px 0 #000; font-weight: bold; }
-        #upgradeMenu, #startMenu, #gameOverMenu, #tutorialMenu {
+        #topStats {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+        #upgradeMenu, #startMenu, #gameOverMenu, #tutorialMenu, #pauseMenu {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.85);
             display: none; flex-direction: column; justify-content: center; align-items: center;
@@ -87,6 +93,11 @@ if ('serviceWorker' in navigator) {
             background: #0ff; border: none; cursor: pointer; color: #000; font-weight: bold;
         }
         button:hover { background: #fff; }
+        button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
         .scanlines {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%);
@@ -112,10 +123,13 @@ if ('serviceWorker' in navigator) {
     
     <div id="uiLayer">
         <div id="topStats">
-            <div class="stat" id="scoreDisplay">SCORE: 0</div>
-            <div class="stat" id="hpDisplay">HP: 100/100</div>
-            <div class="stat" id="levelDisplay">LV: 1 (0%)</div>
-            <div class="stat" id="critDisplay">CRIT: 5% (x1.5)</div>
+            <div>
+                <div class="stat" id="scoreDisplay">SCORE: 0</div>
+                <div class="stat" id="hpDisplay">HP: 100/100</div>
+                <div class="stat" id="levelDisplay">LV: 1 (0%)</div>
+                <div class="stat" id="critDisplay">CRIT: 5% (x1.5)</div>
+            </div>
+            <button id="pauseButton" style="padding: 5px 10px; font-size: 12px; pointer-events: auto;" onclick="togglePause()">PAUSE</button>
         </div>
         <div class="stat" style="text-align:center" id="bossTimerDisplay">NEXT BOSS: 60</div>
     </div>
@@ -149,6 +163,14 @@ if ('serviceWorker' in navigator) {
     <div id="upgradeMenu">
         <h2>LEVEL UP!</h2>
         <div id="cardsContainer"></div>
+        <button id="rerollButton" style="margin-top: 20px;"></button>
+    </div>
+
+    <div id="pauseMenu">
+        <h1>PAUSED</h1>
+        <button onclick="resumeGame()">RESUME</button>
+        <br>
+        <button onclick="resetGame()">RESTART</button>
     </div>
 
     <div id="gameOverMenu">
@@ -170,6 +192,7 @@ var bgm = new Audio();
 bgm.loop = true;
 
 let bgmVolume = 0.5;
+const rerollCost = 1000;
 
 let gameState = 'start';
 let frameCount = 0;
@@ -305,6 +328,9 @@ window.addEventListener('touchstart', e => {
 });
 
 window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        togglePause();
+    }
     if (keys.hasOwnProperty(e.key.toLowerCase())) {
         keys[e.key.toLowerCase()] = true;
     }
@@ -330,6 +356,7 @@ function startGame() {
 }
 function resetGame() {
     document.getElementById('gameOverMenu').style.display = 'none';
+    document.getElementById('pauseMenu').style.display = 'none';
     resetGameData(); // 内部でbgm.pause()が呼ばれる
 
     // BGMを再度選択して再生
@@ -1074,19 +1101,51 @@ function addXp(amount) {
 }
 
 function showUpgradeMenu() {
-    gameState = 'paused';
+    gameState = 'upgrade';
     const menu = document.getElementById('upgradeMenu');
     const container = document.getElementById('cardsContainer');
     container.innerHTML = '';
     menu.style.display = 'flex';
+
+    // Pick 3 unique upgrades
+    const pool = [...upgradePool];
     for(let i=0; i<3; i++) {
-        const upg = upgradePool[Math.floor(Math.random() * upgradePool.length)];
+        if (pool.length === 0) break;
+        const idx = Math.floor(Math.random() * pool.length);
+        const upg = pool.splice(idx, 1)[0];
+        
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `<h3>${upg.name}</h3><p>${upg.desc}</p>`;
         card.onclick = () => { upg.apply(); menu.style.display = 'none'; gameState = 'playing'; loop(); };
         container.appendChild(card);
     }
+
+    const rerollBtn = document.getElementById('rerollButton');
+    rerollBtn.innerText = `REROLL (COST: ${rerollCost})`;
+    rerollBtn.onclick = () => {
+        if (score >= rerollCost) {
+            score -= rerollCost;
+            updateUI();
+            showUpgradeMenu();
+        }
+    };
+    rerollBtn.disabled = score < rerollCost;
+}
+
+function togglePause() {
+    if (gameState === 'playing') {
+        gameState = 'paused';
+        document.getElementById('pauseMenu').style.display = 'flex';
+    } else if (gameState === 'paused') {
+        resumeGame();
+    }
+}
+
+function resumeGame() {
+    gameState = 'playing';
+    document.getElementById('pauseMenu').style.display = 'none';
+    loop();
 }
 
 // --- エフェクト関数群 ---
