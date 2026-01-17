@@ -354,6 +354,12 @@ window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         togglePause();
     }
+    if (e.key === ' ' || e.code === 'Space') {
+        if (gameState === 'playing') {
+            handleTap(0, 0);
+            e.preventDefault();
+        }
+    }
     if (keys.hasOwnProperty(e.key.toLowerCase())) {
         keys[e.key.toLowerCase()] = true;
     }
@@ -699,7 +705,7 @@ function drawGame() {
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 16px "M PLUS 1 Code"';
             ctx.textAlign = 'center';
-            ctx.fillText('TAP!', qte.x, qte.y + 6);
+            ctx.fillText('TAP! or SPACE!', qte.x, qte.y + 6);
         }
     });
 
