@@ -111,8 +111,12 @@ if ('serviceWorker' in navigator) {
     <div id="bossWarning">WARNING!<br>BOSS APPROACHING</div>
     
     <div id="uiLayer">
-        <div class="stat" id="scoreDisplay">SCORE: 0</div>
-        <div class="stat" id="hpDisplay">HP: 100</div>
+        <div id="topStats">
+            <div class="stat" id="scoreDisplay">SCORE: 0</div>
+            <div class="stat" id="hpDisplay">HP: 100/100</div>
+            <div class="stat" id="levelDisplay">LV: 1 (0%)</div>
+            <div class="stat" id="critDisplay">CRIT: 5% (x1.5)</div>
+        </div>
         <div class="stat" style="text-align:center" id="bossTimerDisplay">NEXT BOSS: 60</div>
     </div>
 
@@ -1127,6 +1131,13 @@ function drawShockwaves() {
 function updateUI() {
     document.getElementById('scoreDisplay').innerText = `SCORE: ${score}`;
     document.getElementById('hpDisplay').innerText = `HP: ${Math.floor(player.hp)}/${player.maxHp}`;
+    
+    const xpPercent = Math.floor((player.xp / player.nextLevelXp) * 100);
+    document.getElementById('levelDisplay').innerText = `LV: ${player.level} (${xpPercent}%)`;
+    
+    const critChance = Math.round(player.critChance * 100);
+    document.getElementById('critDisplay').innerText = `CRIT: ${critChance}% (x${player.critDamage.toFixed(1)})`;
+
     // ボスまでの残り時間を秒で表示
     const secondsToBoss = Math.max(0, Math.ceil(timeToNextBoss / 60));
     document.getElementById('bossTimerDisplay').innerText = isBossActive ? "BOSS FIGHT!" : `NEXT BOSS: ${secondsToBoss}`;
