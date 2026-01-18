@@ -831,7 +831,7 @@ function drawGame() {
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 16px "M PLUS 1 Code"';
             ctx.textAlign = 'center';
-            ctx.fillText('TAP! or SPACE!', qte.x, qte.y + 6);
+            ctx.fillText('TAP!', qte.x, qte.y + 6);
         }
     });
 
@@ -1454,14 +1454,27 @@ function drawShockwaves() {
 }
 
 function updateTutorial() {
+    const overlay = document.getElementById('tutorialOverlay');
+    const msgBox = document.getElementById('tutorialMessage');
+
     if (!isTutorialMode) {
-        document.getElementById('tutorialOverlay').style.display = 'none';
+        // --- 通常プレイ時のギミック表示 ---
+        let bossPrompt = "";
+        enemies.forEach(e => {
+            if (e.isBoss && e.quickTap && e.quickTap.state === 'active') {
+                bossPrompt = "TAP! or SPACE!";
+            }
+        });
+
+        if (bossPrompt) {
+            overlay.style.display = 'block';
+            msgBox.innerText = bossPrompt;
+        } else {
+            overlay.style.display = 'none';
+        }
         return;
     }
 
-    const overlay = document.getElementById('tutorialOverlay');
-    const msgBox = document.getElementById('tutorialMessage');
-    
     if (tutorialStep < tutorialSteps.length) {
         overlay.style.display = 'block';
         const step = tutorialSteps[tutorialStep];
