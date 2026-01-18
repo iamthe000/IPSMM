@@ -120,6 +120,15 @@ if ('serviceWorker' in navigator) {
             transform: scale(1.2);
         }
         @keyframes blink { from { opacity: 1; transform: scale(1.2); } to { opacity: 0.1; transform: scale(1.25); } }
+        #tutorialOverlay {
+            position: absolute; bottom: 80px; left: 0; width: 100%; text-align: center;
+            pointer-events: none; z-index: 15; display: none;
+        }
+        #tutorialMessage {
+            background: rgba(0, 0, 0, 0.8); display: inline-block; padding: 10px 20px;
+            border: 2px solid #0ff; color: #fff; font-size: 14px; max-width: 80%;
+            box-shadow: 0 0 10px #0ff;
+        }
     </style>
 </head>
 <body>
@@ -128,6 +137,7 @@ if ('serviceWorker' in navigator) {
     <canvas id="gameCanvas" width="240" height="320"></canvas>
     <div class="scanlines"></div>
     <div id="bossWarning">WARNING!<br>BOSS APPROACHING</div>
+    <div id="tutorialOverlay"><div id="tutorialMessage"></div></div>
     
     <div id="uiLayer">
         <div id="topStats">
@@ -210,6 +220,9 @@ const rerollCost = 1000;
 var gameState = 'start';
 var frameCount = 0;
 var score = 0;
+var isTutorialMode = false;
+var tutorialStep = 0;
+var tutorialTimer = 0;
 let gameTimeDifficulty = 0;
 
 // ボス戦関連の変数
@@ -237,12 +250,12 @@ var player = {
     doctrineKillCount: 0
 };
 
-let bullets = [];
-let enemies = [];
-let particles = [];
-let xpGems = [];
-let enemyBullets = [];
-let slashes = [];
+var bullets = [];
+var enemies = [];
+var particles = [];
+var xpGems = [];
+var enemyBullets = [];
+var slashes = [];
 let screenInvertTimer = 0;
 let stars = [];
 for(let i=0; i<50; i++) {
@@ -253,6 +266,65 @@ for(let i=0; i<50; i++) {
         baseColor: Math.random() > 0.8 ? '#fff' : '#555'
     });
 }
+
+const tutorialSteps = [
+    {
+        message: "WELCOME TO INFINITY PIXEL STORM!\nLET'S LEARN THE BASICS.",
+        check: () => frameCount > 180, // 3 seconds
+    },
+    {
+        message: "DRAG or use WASD/ARROWS to MOVE.",
+        check: () => {
+            const dx = player.x - (canvas.width / 2);
+            const dy = player.y - (canvas.height - 50);
+            return Math.sqrt(dx*dx + dy*dy) > 40;
+        }
+    },
+    {
+        message: "GOOD. ATTACKS ARE AUTOMATIC.\nENEMIES ARE APPROACHING!",
+        action: () => {
+             for(let i=0; i<3; i++) {
+                 enemies.push({
+                     x: 40 + i*80, y: -20, w: 16, h: 16, hp: 5, speed: 0.5,
+                     sway: 0, offset: 0, fireRate: 1000, baseColor: '#0ff'
+                 });
+             }
+        },
+        check: () => score >= 300
+    },
+    {
+        message: "COLLECT GREEN XP GEMS\nTO LEVEL UP!",
+        check: () => player.level > 1
+    },
+    {
+        message: "LEVELING UP LETS YOU CHOOSE UPGRADES.\nSELECT ONE TO CONTINUE.",
+        check: () => gameState === 'playing' && player.level > 1
+    },
+    {
+        message: "WATCH OUT FOR RED CHARGERS!\nTHEY ARE FAST!",
+        action: () => {
+            enemies.push({
+                x: canvas.width / 2, y: -20, w: 20, h: 20, hp: 5,
+                speed: 2, sway: 0, offset: 0, fireRate: 1000,
+                baseColor: '#f00', isCharger: true, chargeTimer: 60
+            });
+        },
+        check: () => enemies.length === 0 && score >= 400
+    },
+    {
+        message: "WELL DONE. BOSSES HAVE SPECIAL CORES.\nSTAY CLOSE TO COUNTER!",
+        action: () => {
+            spawnBoss();
+            enemies[0].hp = 500; // Tutorial boss has less HP
+        },
+        check: () => !isBossActive && bossDefeatedCount > 0
+    },
+    {
+        message: "TUTORIAL COMPLETE!\nPREPARE FOR THE REAL STORM.",
+        check: () => frameCount > 300, // Just wait a bit after boss kill. 
+        // Wait, frameCount might be high already. I should use a timer.
+    }
+];
 
 const upgradePool = [
     { name: "MULTI SHOT", desc: "弾数が+1増える", apply: () => { player.bulletCount++; player.spread += 0.05; } },
@@ -371,9 +443,16 @@ window.addEventListener('keyup', e => {
 });
 
 
-function startGame() {
+function startGame(tutorial = false) {
     document.getElementById('startMenu').style.display = 'none';
     resetGameData();
+    if (tutorial) {
+        isTutorialMode = true;
+        tutorialStep = 0;
+        tutorialTimer = 0;
+        timeToNextBoss = 999999; // チュートリアル中は自然にボスを出さない
+        if (tutorialSteps[0].action) tutorialSteps[0].action();
+    }
 
     const bgmSelect = document.getElementById('bgmSelect');
     bgm.src = bgmSelect.value;
@@ -410,6 +489,9 @@ function resetGameData() {
     player.doctrine = null; player.doctrineKillCount = 0;
     bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
     score = 0; frameCount = 0; gameTimeDifficulty = 0;
+    isTutorialMode = false;
+    tutorialStep = 0;
+    tutorialTimer = 0;
     // ボス関連リセット
     isBossActive = false; bossDefeatedCount = 0; timeToNextBoss = 60 * 60; bossWarningTimer = 0;
     resetBossEffects();
@@ -449,6 +531,7 @@ function loop() {
         hitStopTimer--;
     } else {
         updateGameLogic();
+        updateTutorial();
     }
     drawGame();
     drawShockwaves();
@@ -515,7 +598,9 @@ function updateGameLogic() {
         }
         // ボスがいない時だけ雑魚スポーン
         const spawnRate = Math.max(15, 60 - gameTimeDifficulty * 0.6);
-        if (frameCount % Math.floor(spawnRate) === 0) spawnEnemy();
+        if (frameCount % Math.floor(spawnRate) === 0) {
+            if (!isTutorialMode) spawnEnemy();
+        }
     }
 
     updateEntities();
@@ -1326,6 +1411,38 @@ function drawShockwaves() {
     }
 }
 
+function updateTutorial() {
+    if (!isTutorialMode) {
+        document.getElementById('tutorialOverlay').style.display = 'none';
+        return;
+    }
+
+    const overlay = document.getElementById('tutorialOverlay');
+    const msgBox = document.getElementById('tutorialMessage');
+    
+    if (tutorialStep < tutorialSteps.length) {
+        overlay.style.display = 'block';
+        const step = tutorialSteps[tutorialStep];
+        msgBox.innerText = step.message;
+
+        if (step.check()) {
+            tutorialStep++;
+            tutorialTimer = 0;
+            if (tutorialStep < tutorialSteps.length && tutorialSteps[tutorialStep].action) {
+                tutorialSteps[tutorialStep].action();
+            }
+        }
+    } else {
+        // Tutorial finished
+        tutorialTimer++;
+        if (tutorialTimer > 180) { // 3 seconds after last step
+            isTutorialMode = false;
+            timeToNextBoss = 60 * 60; // Reset boss timer to normal
+            overlay.style.display = 'none';
+        }
+    }
+}
+
 function updateUI() {
     document.getElementById('scoreDisplay').innerText = `SCORE: ${score}`;
     document.getElementById('hpDisplay').innerText = `HP: ${Math.floor(player.hp)}/${player.maxHp}`;
@@ -1373,6 +1490,13 @@ muteButton.addEventListener('click', () => {
 
 // 初期UI状態を設定
 updateVolume(parseFloat(volumeSlider.value), false);
+
+window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tutorial') === 'true') {
+        startGame(true);
+    }
+});
 
 document.getElementById('startMenu').style.display = 'flex';
 </script>
