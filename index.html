@@ -129,13 +129,6 @@ if ('serviceWorker' in navigator) {
             border: 2px solid #0ff; color: #fff; font-size: 14px; max-width: 80%;
             box-shadow: 0 0 10px #0ff;
         }
-        /* QTE用の強調表示スタイル */
-        #tutorialOverlay.qte-mode {
-            bottom: auto; top: 50%; transform: translateY(-50%);
-        }
-        #tutorialOverlay.qte-mode #tutorialMessage {
-            font-size: 28px; border-color: #fff; box-shadow: 0 0 20px #fff;
-        }
     </style>
 </head>
 <body>
@@ -579,7 +572,7 @@ function loop() {
         hitStopTimer--;
     } else {
         updateGameLogic();
-        updateInstructionalUI();
+        updateTutorial();
     }
     drawGame();
     drawShockwaves();
@@ -835,6 +828,10 @@ function drawGame() {
             ctx.arc(qte.x, qte.y, 10 + progress * 40, 0, Math.PI * 2);
             ctx.stroke();
             
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px "M PLUS 1 Code"';
+            ctx.textAlign = 'center';
+            ctx.fillText('TAP! or SPACE!', qte.x, qte.y + 6);
         }
     });
 
@@ -1456,43 +1453,19 @@ function drawShockwaves() {
     }
 }
 
-function updateInstructionalUI() {
+function updateTutorial() {
+    if (!isTutorialMode) {
+        document.getElementById('tutorialOverlay').style.display = 'none';
+        return;
+    }
+
     const overlay = document.getElementById('tutorialOverlay');
     const msgBox = document.getElementById('tutorialMessage');
-
-    // Quick Tap (QTE) check
-    let qteActive = false;
-    enemies.forEach(e => {
-        if (e.isBoss && e.quickTap && e.quickTap.state === 'active') {
-            qteActive = true;
-        }
-    });
-
-    if (qteActive) {
-        if (!overlay.classList.contains('qte-mode')) {
-            overlay.classList.add('qte-mode');
-            msgBox.innerText = "TAP! or SPACE!";
-        }
-        overlay.style.display = 'block';
-        return;
-    }
-
-    // QTEでない場合はクラスを削除
-    if (overlay.classList.contains('qte-mode')) {
-        overlay.classList.remove('qte-mode');
-    }
-
-    if (!isTutorialMode) {
-        overlay.style.display = 'none';
-        return;
-    }
-
+    
     if (tutorialStep < tutorialSteps.length) {
         overlay.style.display = 'block';
         const step = tutorialSteps[tutorialStep];
-        if (msgBox.innerText !== step.message) {
-            msgBox.innerText = step.message;
-        }
+        msgBox.innerText = step.message;
 
         if (step.check()) {
             tutorialStep++;
