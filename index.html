@@ -312,17 +312,57 @@ const tutorialSteps = [
         check: () => enemies.length === 0 && score >= 400
     },
     {
-        message: "WELL DONE. BOSSES HAVE SPECIAL CORES.\nSTAY CLOSE TO COUNTER!",
+        message: "BOSS APPROACHING! BOSSES HAVE SPECIAL MECHANICS.\nFIRST, THE TIMING CORE.",
         action: () => {
             spawnBoss();
-            enemies[0].hp = 500; // Tutorial boss has less HP
+            if (enemies[0]) {
+                enemies[0].hp = 100000; 
+                enemies[0].timingCore.state = 'active';
+                enemies[0].timingCore.timer = 999;
+            }
+        },
+        check: () => enemies[0] && enemies[0].timingCoreSuccess
+    },
+    {
+        message: "EXCELLENT! NEXT: QUICK TAP.\nTAP THE 'TAP!' PROMPT OR PRESS SPACE!",
+        action: () => {
+            if (enemies[0]) {
+                enemies[0].quickTap.state = 'active';
+                enemies[0].quickTap.timer = 999;
+                enemies[0].quickTap.x = canvas.width / 2;
+                enemies[0].quickTap.y = canvas.height / 2;
+            }
+        },
+        check: () => enemies[0] && enemies[0].quickTapSuccess
+    },
+    {
+        message: "BEWARE OF THE LASER!\nMOVE AWAY FROM THE LINE!",
+        action: () => {
+            if (enemies[0]) {
+                enemies[0].laserState = 'aiming';
+                enemies[0].laserTimer = 60;
+                enemies[0].laserTargetX = player.x;
+                enemies[0].laserTargetY = player.y;
+            }
+        },
+        check: () => enemies[0] && enemies[0].laserState === 'firing'
+    },
+    {
+        message: "STAY OUT OF THE BEAM!",
+        check: () => enemies[0] && enemies[0].laserState === 'idle'
+    },
+    {
+        message: "NOW, FINISH THE BOSS!",
+        action: () => {
+            if (enemies[0]) {
+                enemies[0].hp = 1000;
+            }
         },
         check: () => !isBossActive && bossDefeatedCount > 0
     },
     {
         message: "TUTORIAL COMPLETE!\nPREPARE FOR THE REAL STORM.",
-        check: () => frameCount > 300, // Just wait a bit after boss kill. 
-        // Wait, frameCount might be high already. I should use a timer.
+        check: () => true,
     }
 ];
 
@@ -383,6 +423,7 @@ function handleTap(clientX, clientY) {
         if (e.isBoss && e.quickTap && e.quickTap.state === 'active') {
             const qte = e.quickTap;
             e.hp -= 800 * (bossDefeatedCount + 1);
+            e.quickTapSuccess = true; // For tutorial
             qte.state = 'cooldown';
             qte.timer = 180 + Math.random() * 120;
             
@@ -1064,6 +1105,7 @@ function checkCollisions() {
             if (Math.sqrt(dx*dx + dy*dy) < player.w/2 + core.radius) {
                 // 成功！
                 e.hp -= 500 * (bossDefeatedCount + 1);
+                e.timingCoreSuccess = true; // For tutorial
                 core.state = 'cooldown';
                 core.timer = 240; // 4秒の長めのクールダウン
                 triggerScreenShake(10, 30);
