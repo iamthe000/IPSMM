@@ -1295,7 +1295,7 @@ function spawnEnemy() {
     let baseColor = isCharger ? '#f00' : `hsl(${Math.random()*360}, 70%, 50%)`;
 
     if (isRare) {
-        w = 22; h = 22; // 少し大きめで正方形（円にするため）
+        w = 18; h = 18; // 以前より少し小さめに調整
         hp = 100 * diff; // HP多め
         baseColor = '#AA00AA';
     }
