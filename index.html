@@ -35,7 +35,7 @@ if ('serviceWorker' in navigator) {
             box-shadow: 0 0 20px var(--glow-color);
             transition: box-shadow 0.5s;
         }
-        canvas {
+        #gameCanvas {
             background-color: #000;
             image-rendering: pixelated;
             width: 100%;
@@ -154,7 +154,13 @@ if ('serviceWorker' in navigator) {
 
     <div id="startMenu" style="display:flex;">
         <h1>INFINITY PIXEL STORM<br>:MONOCHROME MENACE</h1>
-        <p style="color:#aaa; font-size:12px; margin-bottom:20px;">DRAG TO MOVE / AUTO FIRE<br>WATCH OUT FOR CHARGERS!</p>
+        <div id="commanderSection" style="width: 90%; display: flex; align-items: center; border: 1px solid #0ff; background: rgba(0, 255, 255, 0.05); padding: 10px; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);">
+            <canvas id="commanderCanvas" width="60" height="60" style="flex-shrink: 0;"></canvas>
+            <div style="flex: 1; margin-left: 10px; font-size: 11px; text-align: left; line-height: 1.4; color: #fff; font-family: 'M PLUS 1 Code';">
+                「我々人類は未知の脅威を撃退し、宇宙へ進出した。そこで宇宙にはびこる宇宙人どもを退治してほしい。なるべく多く頼む」
+            </div>
+        </div>
+        <p style="color:#aaa; font-size:11px; margin-bottom:15px;">DRAG TO MOVE / AUTO FIRE<br>WATCH OUT FOR CHARGERS!</p>
         <div style="margin-bottom: 20px;">
             <label for="bgmSelect" style="color: #aaa; font-size: 12px; margin-right: 10px;">BGM:</label>
             <select id="bgmSelect" style="background: #333; color: white; border: 1px solid #555; padding: 5px;">
@@ -1568,6 +1574,85 @@ window.addEventListener('load', () => {
         startGame(true);
     }
 });
+
+// --- コマンダー（スタート画面のキャラクター）の描画ロジック ---
+let commanderState = {
+    x: 30, y: 40, radius: 15, color: '#AA00AA',
+    recoil: 0, mouseX: 60, mouseY: 20, panic: false
+};
+
+function drawCommander() {
+    const c = document.getElementById('commanderCanvas');
+    if (!c) return;
+    const cc = c.getContext('2d');
+    cc.clearRect(0, 0, c.width, c.height);
+
+    // 反動の減衰
+    commanderState.recoil *= 0.85;
+    if (Math.random() < 0.01) {
+        commanderState.recoil = 5;
+        commanderState.panic = true;
+        setTimeout(() => { commanderState.panic = false; }, 500);
+    }
+
+    const cx = commanderState.x;
+    const cy = commanderState.y;
+
+    // 体（円形）
+    cc.fillStyle = commanderState.color;
+    cc.beginPath();
+    cc.arc(cx, cy, commanderState.radius, 0, Math.PI * 2);
+    cc.fill();
+
+    // 目（ゲームのスタイルに合わせる）
+    cc.fillStyle = '#000';
+    cc.fillRect(cx - 5, cy - 3, 2, 5);
+    cc.fillRect(cx + 3, cy - 3, 2, 5);
+
+    // 銃
+    const angle = Math.atan2(commanderState.mouseY - cy, commanderState.mouseX - cx);
+    cc.save();
+    cc.translate(cx, cy);
+    cc.rotate(angle);
+    cc.fillStyle = '#333';
+    cc.fillRect(10 - commanderState.recoil, -2, 15, 4);
+    cc.restore();
+
+    // シルクハット
+    cc.fillStyle = '#595959';
+    cc.fillRect(cx - 15, cy - 10 - commanderState.recoil * 0.5, 30, 6);
+    cc.fillRect(cx - 9, cy - 28 - commanderState.recoil * 0.5, 18, 18);
+
+    // パニック時の「！」マーク
+    if (commanderState.panic) {
+        cc.fillStyle = 'white';
+        cc.font = 'bold 12px Arial';
+        cc.fillText('!', cx - 2, cy - 25);
+    }
+
+    if (gameState === 'start') {
+        requestAnimationFrame(drawCommander);
+    }
+}
+
+document.getElementById('startMenu').addEventListener('mousemove', (e) => {
+    const c = document.getElementById('commanderCanvas');
+    if (!c) return;
+    const rect = c.getBoundingClientRect();
+    commanderState.mouseX = e.clientX - rect.left;
+    commanderState.mouseY = e.clientY - rect.top;
+});
+
+document.getElementById('startMenu').addEventListener('touchmove', (e) => {
+    const c = document.getElementById('commanderCanvas');
+    if (!c) return;
+    const rect = c.getBoundingClientRect();
+    commanderState.mouseX = e.touches[0].clientX - rect.left;
+    commanderState.mouseY = e.touches[0].clientY - rect.top;
+});
+
+// 初期描画開始
+drawCommander();
 
 document.getElementById('startMenu').style.display = 'flex';
 </script>
