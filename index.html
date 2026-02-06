@@ -157,7 +157,7 @@ if ('serviceWorker' in navigator) {
         <div id="commanderSection" style="width: 90%; display: flex; align-items: center; border: 1px solid #0ff; background: rgba(0, 255, 255, 0.05); padding: 10px; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);">
             <canvas id="commanderCanvas" width="60" height="60" style="flex-shrink: 0;"></canvas>
             <div style="flex: 1; margin-left: 10px; font-size: 11px; text-align: left; line-height: 1.4; color: #fff; font-family: 'M PLUS 1 Code';">
-                「我々人類は未知の脅威を撃退し、宇宙へ進出した。そこで宇宙にはびこる宇宙人どもを退治してほしい。なるべく多く頼む」
+                "Humanity has repelled the unknown threats and expanded into space. Now, we need you to exterminate the aliens lurking there. Take out as many as you can."
             </div>
         </div>
         <p style="color:#aaa; font-size:11px; margin-bottom:15px;">DRAG TO MOVE / AUTO FIRE<br>WATCH OUT FOR CHARGERS!</p>
@@ -686,6 +686,37 @@ function drawBossBackground() {
     ctx.stroke();
 }
 
+function drawPlayer(x, y, alpha = 1.0) {
+    const w = player.w;
+    const h = player.h;
+    const color = getColor(player.baseColor, 'player');
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Rocket body
+    ctx.fillStyle = color;
+    ctx.fillRect(x - w / 4, y - h / 4, w / 2, h / 2 + 2);
+    
+    // Nose cone
+    ctx.beginPath();
+    ctx.moveTo(x, y - h / 4 - 4);
+    ctx.lineTo(x - w / 4, y - h / 4);
+    ctx.lineTo(x + w / 4, y - h / 4);
+    ctx.fill();
+    
+    // Side fins
+    ctx.fillRect(x - w / 2, y + h / 4, w / 4, h / 4);
+    ctx.fillRect(x + w / 4, y + h / 4, w / 4, h / 4);
+    
+    // Engine flame
+    if (alpha > 0.5 && frameCount % 4 < 2) {
+        ctx.fillStyle = '#f80';
+        ctx.fillRect(x - 1, y + h / 2, 2, 3);
+    }
+    
+    ctx.restore();
+}
+
 function drawGame() {
     // ボス戦かどうかで背景描画を切り替え
     if (isBossActive) {
@@ -698,8 +729,7 @@ function drawGame() {
     }
 
     // プレイヤー
-    ctx.fillStyle = getColor(player.baseColor, 'player');
-    ctx.fillRect(player.x - player.w/2, player.y - player.h/2, player.w, player.h);
+    drawPlayer(player.x, player.y);
 
     if (player.doctrine === 'shield') {
         const shieldCount = 2;
@@ -713,9 +743,7 @@ function drawGame() {
     }
     // 残像はボス戦中は表示しない（視認性のため）
     if (!isBossActive) {
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(player.x - player.w/2, player.y - player.h/2 + 5, player.w, player.h);
-        ctx.globalAlpha = 1.0;
+        drawPlayer(player.x, player.y + 5, 0.3);
     }
 
     // プレイヤー弾
