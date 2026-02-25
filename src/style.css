@@ -1,0 +1,113 @@
+        body {
+            margin: 0;
+            background-color: #000; /* ボス戦の反転に備えて黒固定 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'M PLUS 1 Code', 'Courier New', monospace;
+            color: white;
+            touch-action: none;
+        }
+        #gameContainer {
+            position: relative;
+            /* 通常時は青っぽく、ボス戦時は白っぽく光らせるための変数 */
+            --glow-color: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 20px var(--glow-color);
+            transition: box-shadow 0.5s;
+        }
+        #gameCanvas {
+            background-color: #000;
+            image-rendering: pixelated;
+            width: 100%;
+            height: 100vh;
+            max-width: 600px;
+            display: block;
+            /* ボス戦時に背景色を変えるためのトランジション */
+            transition: background-color 0.5s;
+        }
+        /* UI、メニュー類は前回と同じなので省略 */
+        #uiLayer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 10px; box-sizing: border-box;
+        }
+        .stat { font-size: 14px; text-shadow: 1px 1px 0 #000; font-weight: bold; }
+        #topStats {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+        #upgradeMenu, #startMenu, #gameOverMenu, #tutorialMenu, #pauseMenu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            pointer-events: auto; z-index: 10; color: #fff;
+        }
+        .tutorial-content {
+            width: 85%;
+            height: 80%;
+            overflow-y: auto;
+            text-align: left;
+            padding: 15px;
+            border: 1px solid #555;
+            background: #111;
+            touch-action: auto; /* Allow touch scrolling */
+        }
+        .tutorial-content h2 { color: #0ff; }
+        .tutorial-content h3 { color: #ffeb3b; border-bottom: 1px solid #555; padding-bottom: 5px; }
+        .tutorial-content p { color: #ccc; line-height: 1.6; }
+
+        .card {
+            background: #222; border: 2px solid #fff; padding: 15px; margin: 10px; width: 80%;
+            text-align: center; cursor: pointer; transition: transform 0.1s;
+        }
+        .card:hover { background: #444; transform: scale(1.05); }
+        .card h3 { margin: 0 0 5px 0; color: #ffeb3b; font-size: 16px; }
+        .card p { margin: 0; font-size: 12px; color: #ccc; }
+        .doctrine-card {
+            background: #222; border: 1px solid #fff; padding: 8px 4px; margin: 4px 0; width: 100%;
+            text-align: center; cursor: pointer; font-size: 9px; box-sizing: border-box;
+        }
+        .doctrine-card:hover { background: #444; }
+        .doctrine-card.active { border-color: #0ff; background: #004444; }
+        .doctrine-card h4 { margin: 0; color: #ffeb3b; font-size: 10px; }
+        .doctrine-card p { margin: 2px 0 0 0; color: #aaa; font-size: 8px; line-height: 1.1; }
+        h1 { font-size: 24px; color: #0ff; text-align: center; margin-bottom: 20px; }
+        button {
+            padding: 15px 30px; font-size: 18px; font-family: inherit;
+            background: #0ff; border: none; cursor: pointer; color: #000; font-weight: bold;
+        }
+        button:hover { background: #fff; }
+        button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+        .scanlines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px; pointer-events: none; z-index: 5;
+        }
+        /* ボス警告表示 */
+        #bossWarning {
+            position: absolute; top: 40%; width: 100%; text-align: center;
+            font-size: 30px; color: #f00; display: none; z-index: 8;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+            animation: blink 0.3s infinite alternate;
+            transform: scale(1.2);
+        }
+        @keyframes blink { from { opacity: 1; transform: scale(1.2); } to { opacity: 0.1; transform: scale(1.25); } }
+        #tutorialOverlay {
+            position: absolute; bottom: 80px; left: 0; width: 100%; text-align: center;
+            pointer-events: none; z-index: 15; display: none;
+        }
+        #tutorialMessage {
+            background: rgba(0, 0, 0, 0.8); display: inline-block; padding: 10px 20px;
+            border: 2px solid #0ff; color: #fff; font-size: 14px; max-width: 80%;
+            box-shadow: 0 0 10px #0ff;
+        }
