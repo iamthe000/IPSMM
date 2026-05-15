@@ -42,7 +42,11 @@ var player = {
     agility: 0.2, xpGainMultiplier: 1.0, critChance: 0.05, critDamage: 1.5,
     baseColor: '#0ff', // 元の色を保持
     doctrine: null,
-    doctrineKillCount: 0
+    doctrineKillCount: 0,
+    hasInversionPulse: false,
+    hasExplosionEnlarge: false,
+    shotCount: 0,
+    nextExplosiveShot: Math.floor(3 + Math.random() * 8)
 };
 
 var bullets = [];
@@ -52,6 +56,8 @@ var xpGems = [];
 var enemyBullets = [];
 var slashes = [];
 let screenInvertTimer = 0;
+let pulseTimer = 0;
+let nextPulseTime = 0;
 let stars = [];
 for(let i=0; i<50; i++) {
     stars.push({
@@ -173,14 +179,17 @@ const upgradePool = [
     { name: "BULLET SPEED UP", desc: "弾の速度がUP", apply: () => { player.bulletSpeed += 1.5; } },
     { name: "LEARNING", desc: "取得経験値が15%UP", apply: () => { player.xpGainMultiplier += 0.15; } },
     { name: "CRITICAL HIT", desc: "クリティカル率+5%", apply: () => { player.critChance += 0.05; } },
-    { name: "CRITICAL DAMAGE", desc: "クリティカルダメージ+50%", apply: () => { player.critDamage += 0.5; } }
+    { name: "CRITICAL DAMAGE", desc: "クリティカルダメージ+50%", apply: () => { player.critDamage += 0.5; } },
+    { name: "INV PULSE", desc: "敵をスロー＆画面反転", apply: () => { player.hasInversionPulse = true; } },
+    { name: "EXPLOSION", desc: "数発に1回、着弾時に爆発する", apply: () => { player.hasExplosionEnlarge = true; } }
 ];
 
 const doctrinePool = [
     { id: 'reflect', name: "REFLECT", desc: "自弾の画面枠での一回反射" },
     { id: 'curve', name: "CURVE", desc: "自弾のカーブ" },
     { id: 'shield', name: "SHIELD", desc: "時機の周りをまわる2つの盾" },
-    { id: 'heal', name: "HEAL", desc: "敵を5体倒したら負のHPの半分を回復" }
+    { id: 'heal', name: "HEAL", desc: "敵を5体倒したら負のHPの半分を回復" },
+    { id: 'lastStand', name: "LAST STAND", desc: "HPが低いほど攻撃速度&会心率UP" }
 ];
 const doctrineCost = 1000;
 
@@ -323,6 +332,8 @@ function resetGameData() {
     player.damage = 15; player.bulletSize = 3; player.spread = 0.1; player.pierce = 0;
     player.bulletSpeed = 5; player.agility = 0.2; player.xpGainMultiplier = 1.0; player.critChance = 0.05; player.critDamage = 1.5;
     player.doctrine = null; player.doctrineKillCount = 0;
+    player.hasInversionPulse = false; player.hasExplosionEnlarge = false; player.shotCount = 0;
+    player.nextExplosiveShot = Math.floor(3 + Math.random() * 8);
     bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
     score = 0; frameCount = 0; gameTimeDifficulty = 0;
     isTutorialMode = false;
@@ -330,6 +341,7 @@ function resetGameData() {
     tutorialTimer = 0;
     // ボス関連リセット
     isBossActive = false; bossDefeatedCount = 0; timeToNextBoss = 60 * 60; bossWarningTimer = 0;
+    pulseTimer = 0; nextPulseTime = 0;
     resetBossEffects();
     updateUI();
 }
@@ -373,12 +385,12 @@ function loop() {
     drawShockwaves();
     
     // 画面反転演出 (描画の最後に適用)
-    if (screenInvertTimer > 0) {
+    if (screenInvertTimer > 0 || pulseTimer > 0) {
         ctx.globalCompositeOperation = 'difference';
         ctx.fillStyle = 'white';
         ctx.fillRect(-50, -50, canvas.width + 100, canvas.height + 100);
         ctx.globalCompositeOperation = 'source-over';
-        screenInvertTimer--;
+        if (screenInvertTimer > 0) screenInvertTimer--;
     }
 
     ctx.restore();
@@ -421,7 +433,27 @@ function updateGameLogic() {
         if(star.y > canvas.height) { star.y = 0; star.x = Math.random() * canvas.width; }
     });
 
-    if (frameCount % Math.floor(player.fireRate) === 0) spawnPlayerBullets();
+    // --- 攻撃速度計算 (背水の陣) ---
+    let effectiveFireRate = player.fireRate;
+    if (player.doctrine === 'lastStand') {
+        const hpRatio = player.hp / player.maxHp;
+        effectiveFireRate = player.fireRate * (0.4 + 0.6 * hpRatio); // HP低で最大2.5倍速
+    }
+    if (frameCount % Math.max(1, Math.floor(effectiveFireRate)) === 0) spawnPlayerBullets();
+
+    // --- 反転の衝動管理 ---
+    if (!isBossActive && player.hasInversionPulse) {
+        if (pulseTimer <= 0) {
+            if (nextPulseTime === 0) {
+                nextPulseTime = frameCount + 300 + Math.random() * 1200;
+            }
+            if (frameCount >= nextPulseTime) {
+                pulseTimer = 900; // 15秒
+                nextPulseTime = frameCount + 900 + 600 + Math.random() * 1800;
+            }
+        }
+    }
+    if (pulseTimer > 0) pulseTimer--;
 
     // --- ボス出現管理 ---
     if (!isBossActive) {
@@ -689,6 +721,8 @@ function drawGame() {
 }
 
 function updateEntities() {
+    const slowFactor = pulseTimer > 0 ? 0.5 : 1.0;
+    enemies = enemies.filter(e => !e.dead);
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         
@@ -712,17 +746,18 @@ function updateEntities() {
         if (b.y < -50 || b.x < -50 || b.x > canvas.width + 50 || b.y > canvas.height + 50) bullets.splice(i, 1);
     }
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
-        let b = enemyBullets[i]; b.x += b.vx; b.y += b.vy;
+        let b = enemyBullets[i]; b.x += b.vx * slowFactor; b.y += b.vy * slowFactor;
         if (b.y > canvas.height + 10 || b.x < -10 || b.x > canvas.width + 10) enemyBullets.splice(i, 1);
     }
 
     for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i];
+        if (e.dead) continue;
         
         if (e.isBoss) {
             // ボスの動き：ゆっくり降りてきて左右に動く
-            if (e.y < 60) e.y += 0.5;
-            e.x += Math.sin(frameCount * 0.02) * 2;
+            if (e.y < 60) e.y += 0.5 * slowFactor;
+            e.x += Math.sin(frameCount * 0.02) * 2 * slowFactor;
 
             // 新しいオーラエフェクト
             if (frameCount % 4 === 0) { // 頻度を調整
@@ -742,7 +777,7 @@ function updateEntities() {
             // --- Quick Tap (QTE) Logic ---
             const qte = e.quickTap;
             if (qte) {
-                qte.timer--;
+                qte.timer -= slowFactor;
                 if (qte.timer <= 0) {
                     if (qte.state === 'inactive') {
                         qte.state = 'active';
@@ -763,7 +798,7 @@ function updateEntities() {
 
             // --- タイミングコアのロジック ---
             const core = e.timingCore;
-            core.timer--;
+            core.timer -= slowFactor;
             if (core.timer <= 0) {
                 switch (core.state) {
                     case 'inactive':
@@ -793,7 +828,7 @@ function updateEntities() {
             }
             
             // --- スパイラル攻撃のロジック ---
-            e.spiralAttack.timer--;
+            e.spiralAttack.timer -= slowFactor;
             if (e.spiralAttack.timer <= 0 && !e.spiralAttack.active) {
                 e.spiralAttack.active = true;
                 e.spiralAttack.timer = 180; // 3秒間攻撃
@@ -818,7 +853,7 @@ function updateEntities() {
             }
 
             // --- レーザー攻撃のロジック ---
-            e.laserTimer--;
+            e.laserTimer -= slowFactor;
             if (e.laserTimer <= 0 && e.laserState === 'idle') {
                 e.laserState = 'aiming';
                 e.laserTimer = 90; // 1.5秒エイミング
@@ -844,7 +879,8 @@ function updateEntities() {
             }
 
             // ボスの攻撃パターン（インフレする）
-            if (frameCount % e.fireRate === 0) {
+            const effectiveBossFireRate = Math.floor(e.fireRate / slowFactor);
+            if (frameCount % effectiveBossFireRate === 0) {
                 createParticles(e.x, e.y, '#fff', 5); // 弾発射時にもエフェクト
                 // 放射状攻撃
                 const ways = 8 + bossDefeatedCount * 2;
@@ -861,17 +897,18 @@ function updateEntities() {
         } else if (e.isCharger) {
             // 反射神経要素：突撃タイプの敵
             if (e.chargeTimer > 0) {
-                e.chargeTimer--; // 溜め中
-                e.y += 0.5; // 少しずつ降りる
+                e.chargeTimer -= slowFactor; // 溜め中
+                e.y += 0.5 * slowFactor; // 少しずつ降りる
             } else {
                 // 突撃開始！
-                e.y += e.speed * 5; // 通常の5倍速
+                e.y += e.speed * 5 * slowFactor; // 通常の5倍速
             }
         } else {
             // 通常の敵
-            e.y += e.speed;
-            e.x += Math.sin(frameCount * 0.05 + e.offset) * e.sway;
-            if (frameCount % e.fireRate === 0 && e.y < canvas.height - 50) {
+            e.y += e.speed * slowFactor;
+            e.x += Math.sin(frameCount * 0.05 + e.offset) * e.sway * slowFactor;
+            const effectiveEnemyFireRate = Math.floor(e.fireRate / slowFactor);
+            if (frameCount % effectiveEnemyFireRate === 0 && e.y < canvas.height - 50) {
                 let angle = Math.atan2(player.y - e.y, player.x - e.x);
                 enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2 });
             }
@@ -881,9 +918,9 @@ function updateEntities() {
     }
 
     for (let i = xpGems.length - 1; i >= 0; i--) {
-        let g = xpGems[i]; g.y += 1;
+        let g = xpGems[i]; g.y += 1 * slowFactor;
         let dx = player.x - g.x, dy = player.y - g.y;
-        if (Math.sqrt(dx*dx + dy*dy) < 50) { g.x += dx * 0.15; g.y += dy * 0.15; }
+        if (Math.sqrt(dx*dx + dy*dy) < 50) { g.x += dx * 0.15 * slowFactor; g.y += dy * 0.15 * slowFactor; }
         if (g.y > canvas.height) xpGems.splice(i, 1);
     }
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -893,12 +930,20 @@ function updateEntities() {
 }
 
 function checkCollisions() {
-    bullets.forEach(b => {
-        enemies.forEach((e, eIdx) => {
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            const e = enemies[j];
+            if (e.dead) continue;
             if (!b.dead && rectIntersect(b.x, b.y, b.size, e.x, e.y, e.w, e.h)) {
                 let finalDamage = player.damage;
                 let isCritical = false;
-                if (Math.random() < player.critChance) {
+                let effectiveCritChance = player.critChance;
+                if (player.doctrine === 'lastStand') {
+                    const hpRatio = player.hp / player.maxHp;
+                    effectiveCritChance = player.critChance + (1.0 - hpRatio) * 0.4; // HPが低いほど最大+40%
+                }
+                if (Math.random() < effectiveCritChance) {
                     finalDamage *= player.critDamage;
                     isCritical = true;
                 }
@@ -911,15 +956,35 @@ function checkCollisions() {
                     createParticles(e.x, e.y, isBossActive ? '#fff' : e.baseColor, 2);
                 }
                 
+                if (b.isExplosive) {
+                    triggerShockwave(b.x, b.y);
+                    createParticles(b.x, b.y, '#ffeb3b', 15);
+                    triggerScreenShake(3, 5);
+                    // AOE Damage
+                    for (let k = enemies.length - 1; k >= 0; k--) {
+                        const otherE = enemies[k];
+                        if (otherE.dead) continue;
+                        const dx = otherE.x - b.x;
+                        const dy = otherE.y - b.y;
+                        if (Math.sqrt(dx*dx + dy*dy) < 40) {
+                            otherE.hp -= player.damage * 0.5;
+                            if (otherE.hp <= 0) killEnemy(otherE);
+                        }
+                    }
+                    b.dead = true;
+                }
+
                 if (b.pierce <= 0) b.dead = true; else b.pierce--;
-                if (e.hp <= 0) killEnemy(e, eIdx);
+                if (e.hp <= 0) killEnemy(e);
             }
-        });
-    });
+        }
+    }
     bullets = bullets.filter(b => !b.dead);
 
     let hit = false;
-    enemies.forEach((e, eIdx) => {
+    for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (e.dead) continue;
         if (rectIntersect(player.x, player.y, 4, e.x, e.y, e.w, e.h)) hit = true;
 
         if (player.doctrine === 'shield') {
@@ -930,7 +995,7 @@ function checkCollisions() {
                 const sy = player.y + Math.sin(angle) * 30;
                 if (rectIntersect(sx, sy, 8, e.x, e.y, e.w, e.h)) {
                     e.hp -= player.damage * 0.1;
-                    if (e.hp <= 0) killEnemy(e, eIdx);
+                    if (e.hp <= 0) killEnemy(e);
                 }
             }
         }
@@ -965,7 +1030,7 @@ function checkCollisions() {
                 hit = true;
             }
         }
-    });
+    }
     for (let j = enemyBullets.length - 1; j >= 0; j--) {
         const b = enemyBullets[j];
         if (rectIntersect(player.x, player.y, 4, b.x, b.y, 4, 4)) {
@@ -1012,7 +1077,14 @@ function rectIntersect(x1, y1, s1, x2, y2, w2, h2) {
 }
 
 function spawnPlayerBullets() {
+    player.shotCount++;
     const count = player.bulletCount;
+    let isExplosive = false;
+    if (player.hasExplosionEnlarge && player.shotCount >= player.nextExplosiveShot) {
+        isExplosive = true;
+        player.nextExplosiveShot = player.shotCount + Math.floor(3 + Math.random() * 8);
+    }
+    
     for (let i = 0; i < count; i++) {
         let angleOffset = (i - (count - 1) / 2) * player.spread;
         if (count > 30) angleOffset += (Math.random() - 0.5) * 0.5;
@@ -1020,8 +1092,10 @@ function spawnPlayerBullets() {
         bullets.push({
             x: player.x, y: player.y,
             vx: Math.cos(angle) * player.bulletSpeed, vy: Math.sin(angle) * player.bulletSpeed,
-            size: player.bulletSize, pierce: player.pierce, dead: false,
-            reflected: false
+            size: isExplosive ? player.bulletSize * 2 : player.bulletSize, 
+            pierce: player.pierce, dead: false,
+            reflected: false,
+            isExplosive: isExplosive
         });
     }
 }
@@ -1137,8 +1211,9 @@ function spawnEnemy() {
     });
 }
 
-function killEnemy(e, index) {
-    if (enemies[index]) enemies.splice(index, 1);
+function killEnemy(e) {
+    if (e.dead) return;
+    e.dead = true;
     
     if (player.doctrine === 'heal') {
         player.doctrineKillCount++;
