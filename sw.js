@@ -1,4 +1,4 @@
-var CACHE_NAME = 'ips';
+var CACHE_NAME = 'ipsmm';
 var urlsToCache = [
     '/apps/pwa/',
     '/apps/pwa/index.html'
