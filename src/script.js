@@ -936,7 +936,7 @@ function checkCollisions() {
             const e = enemies[j];
             if (e.dead) continue;
             if (!b.dead && rectIntersect(b.x, b.y, b.size, e.x, e.y, e.w, e.h)) {
-                let finalDamage = player.damage;
+                let finalDamage = player.damage * (b.isExplosive ? 3.0 : 1.0); // 爆発弾は直撃ダメージ3倍
                 let isCritical = false;
                 let effectiveCritChance = player.critChance;
                 if (player.doctrine === 'lastStand') {
@@ -959,15 +959,15 @@ function checkCollisions() {
                 if (b.isExplosive) {
                     triggerShockwave(b.x, b.y);
                     createParticles(b.x, b.y, '#ffeb3b', 15);
-                    triggerScreenShake(3, 5);
+                    triggerScreenShake(8, 10);
                     // AOE Damage
                     for (let k = enemies.length - 1; k >= 0; k--) {
                         const otherE = enemies[k];
                         if (otherE.dead) continue;
                         const dx = otherE.x - b.x;
                         const dy = otherE.y - b.y;
-                        if (Math.sqrt(dx*dx + dy*dy) < 40) {
-                            otherE.hp -= player.damage * 0.5;
+                        if (Math.sqrt(dx*dx + dy*dy) < 60) { // 範囲を40から60へ拡大
+                            otherE.hp -= player.damage * 1.5; // 周囲ダメージを0.5から1.5へ強化
                             if (otherE.hp <= 0) killEnemy(otherE);
                         }
                     }
