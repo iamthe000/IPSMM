@@ -46,7 +46,10 @@ var player = {
     hasInversionPulse: false,
     hasExplosionEnlarge: false,
     shotCount: 0,
-    nextExplosiveShot: Math.floor(3 + Math.random() * 8)
+    nextExplosiveShot: Math.floor(3 + Math.random() * 8),
+    acquiredUpgrades: [],
+    canRevive: true,
+    invincibilityTimer: 0
 };
 
 var bullets = [];
@@ -168,20 +171,20 @@ const tutorialSteps = [
 ];
 
 const upgradePool = [
-    { name: "MULTI SHOT", desc: "弾数が+1増える", apply: () => { player.bulletCount++; player.spread += 0.05; } },
-    { name: "RAPID FIRE", desc: "連射速度UP", apply: () => { player.fireRate = Math.max(2, player.fireRate * 0.85); } }, // 連射上限設定
-    { name: "BIGGER BULLET", desc: "弾サイズと威力UP", apply: () => { player.bulletSize += 1.5; player.damage *= 1.4; } },
-    { name: "WIDE SPREAD", desc: "攻撃範囲が広がる", apply: () => { player.spread += 0.25; player.bulletCount++; } },
-    { name: "PIERCING", desc: "弾が敵を貫通する", apply: () => { player.pierce++; player.damage *= 0.9; } },
-    { name: "VIT UP", desc: "最大HP回復＆増加", apply: () => { player.maxHp += 50; player.hp = player.maxHp; } },
-    { name: "CHAOS BEAM", desc: "制御不能な高威力弾", apply: () => { player.damage *= 1.8; player.spread += 0.4; player.bulletCount += 2; } },
-    { name: "AGILITY UP", desc: "移動の追従性がUP", apply: () => { player.agility = Math.min(1.0, player.agility + 0.08); } },
-    { name: "BULLET SPEED UP", desc: "弾の速度がUP", apply: () => { player.bulletSpeed += 1.5; } },
-    { name: "LEARNING", desc: "取得経験値が15%UP", apply: () => { player.xpGainMultiplier += 0.15; } },
-    { name: "CRITICAL HIT", desc: "クリティカル率+5%", apply: () => { player.critChance += 0.05; } },
-    { name: "CRITICAL DAMAGE", desc: "クリティカルダメージ+50%", apply: () => { player.critDamage += 0.5; } },
-    { name: "INV PULSE", desc: "敵をスロー＆画面反転", apply: () => { player.hasInversionPulse = true; } },
-    { name: "EXPLOSION", desc: "数発に1回、着弾時に爆発する", apply: () => { player.hasExplosionEnlarge = true; } }
+    { name: "MULTI SHOT", desc: "弾数が+1増える", apply: () => { player.bulletCount++; player.spread += 0.05; }, sacrifice: () => { player.bulletCount--; player.spread -= 0.05; } },
+    { name: "RAPID FIRE", desc: "連射速度UP", apply: () => { player.fireRate = Math.max(2, player.fireRate * 0.85); }, sacrifice: () => { player.fireRate /= 0.85; } }, // 連射上限設定
+    { name: "BIGGER BULLET", desc: "弾サイズと威力UP", apply: () => { player.bulletSize += 1.5; player.damage *= 1.4; }, sacrifice: () => { player.bulletSize -= 1.5; player.damage /= 1.4; } },
+    { name: "WIDE SPREAD", desc: "攻撃範囲が広がる", apply: () => { player.spread += 0.25; player.bulletCount++; }, sacrifice: () => { player.spread -= 0.25; player.bulletCount--; } },
+    { name: "PIERCING", desc: "弾が敵を貫通する", apply: () => { player.pierce++; player.damage *= 0.9; }, sacrifice: () => { player.pierce--; player.damage /= 0.9; } },
+    { name: "VIT UP", desc: "最大HP回復＆増加", apply: () => { player.maxHp += 50; player.hp = player.maxHp; }, sacrifice: () => { player.maxHp -= 50; player.hp = Math.min(player.hp, player.maxHp); } },
+    { name: "CHAOS BEAM", desc: "制御不能な高威力弾", apply: () => { player.damage *= 1.8; player.spread += 0.4; player.bulletCount += 2; }, sacrifice: () => { player.damage /= 1.8; player.spread -= 0.4; player.bulletCount -= 2; } },
+    { name: "AGILITY UP", desc: "移動の追従性がUP", apply: () => { player.agility = Math.min(1.0, player.agility + 0.08); }, sacrifice: () => { player.agility -= 0.08; } },
+    { name: "BULLET SPEED UP", desc: "弾の速度がUP", apply: () => { player.bulletSpeed += 1.5; }, sacrifice: () => { player.bulletSpeed -= 1.5; } },
+    { name: "LEARNING", desc: "取得経験値が15%UP", apply: () => { player.xpGainMultiplier += 0.15; }, sacrifice: () => { player.xpGainMultiplier -= 0.15; } },
+    { name: "CRITICAL HIT", desc: "クリティカル率+5%", apply: () => { player.critChance += 0.05; }, sacrifice: () => { player.critChance -= 0.05; } },
+    { name: "CRITICAL DAMAGE", desc: "クリティカルダメージ+50%", apply: () => { player.critDamage += 0.5; }, sacrifice: () => { player.critDamage -= 0.5; } },
+    { name: "INV PULSE", desc: "敵をスロー＆画面反転", apply: () => { player.hasInversionPulse = true; }, sacrifice: () => { if (!player.acquiredUpgrades.some(u => u.name === "INV PULSE")) player.hasInversionPulse = false; } },
+    { name: "EXPLOSION", desc: "数発に1回、着弾時に爆発する", apply: () => { player.hasExplosionEnlarge = true; }, sacrifice: () => { if (!player.acquiredUpgrades.some(u => u.name === "EXPLOSION")) player.hasExplosionEnlarge = false; } }
 ];
 
 const doctrinePool = [
@@ -334,6 +337,9 @@ function resetGameData() {
     player.doctrine = null; player.doctrineKillCount = 0;
     player.hasInversionPulse = false; player.hasExplosionEnlarge = false; player.shotCount = 0;
     player.nextExplosiveShot = Math.floor(3 + Math.random() * 8);
+    player.acquiredUpgrades = [];
+    player.canRevive = true;
+    player.invincibilityTimer = 0;
     bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
     score = 0; frameCount = 0; gameTimeDifficulty = 0;
     isTutorialMode = false;
@@ -475,10 +481,21 @@ function updateGameLogic() {
     checkCollisions();
     updateUI();
     
+    if (player.invincibilityTimer > 0) player.invincibilityTimer--;
+
     if (player.hp <= 0) {
         gameState = 'gameover';
         document.getElementById('finalScoreScore').innerText = "SCORE: " + score;
         document.getElementById('finalScoreBoss').innerText = "BOSS DEFEATED: " + bossDefeatedCount;
+        
+        // 復活ボタンの表示制御
+        const reviveBtn = document.getElementById('reviveButton');
+        if (player.canRevive && player.acquiredUpgrades.length > 0) {
+            reviveBtn.style.display = 'inline-block';
+        } else {
+            reviveBtn.style.display = 'none';
+        }
+
         document.getElementById('gameOverMenu').style.display = 'flex';
         resetBossEffects();
     }
@@ -508,6 +525,8 @@ function drawBossBackground() {
 }
 
 function drawPlayer(x, y, alpha = 1.0) {
+    if (player.invincibilityTimer > 0 && Math.floor(frameCount / 5) % 2 === 0) return;
+
     const w = player.w;
     const h = player.h;
     const color = getColor(player.baseColor, 'player');
@@ -1057,7 +1076,7 @@ function checkCollisions() {
         }
     }
 
-    if (hit) {
+    if (hit && player.invincibilityTimer <= 0) {
         player.hp -= isBossActive ? 15 : 5; // ボス戦中は被ダメUP
         createParticles(player.x, player.y, '#f00', 5);
         if (player.hp < 0) player.hp = 0;
@@ -1284,7 +1303,13 @@ function showUpgradeMenu() {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `<h3>${upg.name}</h3><p>${upg.desc}</p>`;
-        card.onclick = () => { upg.apply(); menu.style.display = 'none'; gameState = 'playing'; loop(); };
+        card.onclick = () => {
+            upg.apply();
+            player.acquiredUpgrades.push(upg);
+            menu.style.display = 'none';
+            gameState = 'playing';
+            loop();
+        };
         container.appendChild(card);
     }
 
@@ -1298,6 +1323,48 @@ function showUpgradeMenu() {
         }
     };
     rerollBtn.disabled = score < rerollCost;
+}
+
+function showReviveConfirm() {
+    document.getElementById('gameOverDefault').style.display = 'none';
+    document.getElementById('reviveConfirm').style.display = 'block';
+}
+
+function cancelRevive() {
+    document.getElementById('reviveConfirm').style.display = 'none';
+    document.getElementById('gameOverDefault').style.display = 'flex';
+}
+
+function confirmRevive() {
+    if (player.acquiredUpgrades.length === 0) {
+        // 万が一スキルがない場合はそのまま復活（基本ありえないがセーフティとして）
+        document.getElementById('sacrificeMessage').innerText = "犠牲にするスキルがありませんでした。";
+    } else {
+        const idx = Math.floor(Math.random() * player.acquiredUpgrades.length);
+        const sacrificed = player.acquiredUpgrades.splice(idx, 1)[0];
+        sacrificed.sacrifice();
+        document.getElementById('sacrificeMessage').innerText = `スキル「${sacrificed.name}」が犠牲になりました。`;
+    }
+
+    document.getElementById('reviveConfirm').style.display = 'none';
+    document.getElementById('reviveResult').style.display = 'block';
+}
+
+function executeRevive() {
+    document.getElementById('gameOverMenu').style.display = 'none';
+    document.getElementById('reviveResult').style.display = 'none';
+    document.getElementById('gameOverDefault').style.display = 'flex'; // 次回のために戻しておく
+
+    player.hp = player.maxHp;
+    player.canRevive = false;
+    player.invincibilityTimer = 180;
+    
+    // 周囲をクリア
+    enemies = [];
+    enemyBullets = [];
+    
+    gameState = 'playing';
+    loop();
 }
 
 function togglePause() {
