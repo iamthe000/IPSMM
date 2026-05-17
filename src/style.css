@@ -48,6 +48,10 @@
             display: none; flex-direction: column; justify-content: center; align-items: center;
             pointer-events: auto; z-index: 10; color: #fff;
         }
+        #gameOverDefault {
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            width: 100%; height: 100%;
+        }
         .tutorial-content {
             width: 85%;
             height: 80%;
