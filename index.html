@@ -84,12 +84,27 @@
     </div>
 
     <div id="gameOverMenu">
-        <h1 style="color:#f00">GAME OVER</h1>
-        <p id="finalScoreScore" style="margin-bottom:10px;">SCORE: 0</p>
-        <p id="finalScoreBoss" style="color:#aaa; margin-bottom:20px;">BOSS DEFEATED: 0</p>
-        <button onclick="resetGame()">RESTART</button>
-        <br>
-        <button onclick="location.href='music.html'">SOUND ROOM</button>
+        <div id="gameOverDefault">
+            <h1 style="color:#f00">GAME OVER</h1>
+            <p id="finalScoreScore" style="margin-bottom:10px;">SCORE: 0</p>
+            <p id="finalScoreBoss" style="color:#aaa; margin-bottom:20px;">BOSS DEFEATED: 0</p>
+            <button onclick="resetGame()">RESTART</button>
+            <br>
+            <button id="reviveButton" onclick="showReviveConfirm()" style="display:none; margin-top: 10px; background: #ffeb3b;">REVIVAL</button>
+            <br>
+            <button onclick="location.href='music.html'">SOUND ROOM</button>
+        </div>
+        <div id="reviveConfirm" style="display:none; text-align:center; padding: 20px;">
+            <h2 style="color:#ffeb3b">REVIVAL?</h2>
+            <p style="font-size: 12px; margin-bottom: 20px;">ランダムなスキル一つを犠牲によみがえります。<br>本当にいいですか？</p>
+            <button onclick="confirmRevive()">はい</button>
+            <button onclick="cancelRevive()" style="background:#555; color:#ccc; margin-left:10px;">いいえ</button>
+        </div>
+        <div id="reviveResult" style="display:none; text-align:center; padding: 20px;">
+            <h2 style="color:#0ff">REVIVED</h2>
+            <p id="sacrificeMessage" style="font-size: 14px; margin-bottom: 20px;"></p>
+            <button onclick="executeRevive()">出撃</button>
+        </div>
     </div>
 </div>
 
