@@ -21,9 +21,9 @@ var tutorialTimer = 0;
 let gameTimeDifficulty = 0;
 
 // ボス戦関連の変数
-let isBossActive = false;
-let bossDefeatedCount = 0;
-let timeToNextBoss = 60 * 60; // 60秒 (60fps換算)
+var isBossActive = false;
+var bossDefeatedCount = 0;
+var timeToNextBoss = 60 * 60; // 60秒 (60fps換算)
 let bossWarningTimer = 0;
 
 // 新しいエフェクト用の変数
@@ -1362,6 +1362,11 @@ function executeRevive() {
     // 周囲をクリア
     enemies = [];
     enemyBullets = [];
+
+    // ボス戦中だった場合は再生成する
+    if (isBossActive) {
+        spawnBoss();
+    }
     
     gameState = 'playing';
     loop();
