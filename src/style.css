@@ -52,6 +52,36 @@
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             width: 100%; height: 100%;
         }
+        #finalResultDetails {
+            width: 82%;
+            max-width: 360px;
+            border: 1px solid #555;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 10px;
+            margin-bottom: 18px;
+            box-sizing: border-box;
+            font-size: 11px;
+            color: #ccc;
+            line-height: 1.5;
+        }
+        #finalResultDetails .result-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 2px 0;
+        }
+        #finalResultDetails .result-row span:last-child {
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+        #finalResultDetails .result-row:last-child { border-bottom: 0; }
+        #finalResultDetails .result-label { color: #0ff; }
+        #eventDisplay {
+            min-height: 18px;
+            color: #ffeb3b;
+            text-shadow: 1px 1px 0 #000;
+        }
         .tutorial-content {
             width: 85%;
             height: 80%;

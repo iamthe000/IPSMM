@@ -19,6 +19,27 @@ var isTutorialMode = false;
 var tutorialStep = 0;
 var tutorialTimer = 0;
 let gameTimeDifficulty = 0;
+let runStartFrame = 0;
+
+const enemyTypes = {
+    normal: 'GUNNER',
+    charger: 'CHARGER',
+    rare: 'RARE',
+    sniper: 'SNIPER',
+    splitter: 'SPLITTER',
+    guardian: 'GUARDIAN',
+    fragment: 'FRAGMENT'
+};
+const bossTypes = [
+    { id: 'core', name: 'TIMING CORE', color: '#fff' },
+    { id: 'laser', name: 'LASER DREADNOUGHT', color: '#ffe066' },
+    { id: 'summoner', name: 'VOID SUMMONER', color: '#9cffd9' },
+    { id: 'storm', name: 'SPIRAL STORM', color: '#ff9cf3' }
+];
+let currentEnvironment = null;
+let nextEnvironmentFrame = 60 * 25;
+let meteors = [];
+let runStats = createRunStats();
 
 // ボス戦関連の変数
 var isBossActive = false;
@@ -30,6 +51,17 @@ let bossWarningTimer = 0;
 let screenShake = { magnitude: 0, duration: 0 };
 let hitStopTimer = 0;
 let shockwaves = [];
+
+function createRunStats() {
+    return {
+        enemiesKilled: 0,
+        damageTaken: 0,
+        maxLevel: 1,
+        upgradesChosen: 0,
+        bossesByType: {},
+        enemiesByType: {}
+    };
+}
 
 const input = { x: canvas.width / 2, y: canvas.height - 50 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -341,7 +373,9 @@ function resetGameData() {
     player.canRevive = true;
     player.invincibilityTimer = 0;
     bullets = []; enemies = []; particles = []; xpGems = []; enemyBullets = [];
-    score = 0; frameCount = 0; gameTimeDifficulty = 0;
+    score = 0; frameCount = 0; runStartFrame = 0; gameTimeDifficulty = 0;
+    currentEnvironment = null; nextEnvironmentFrame = 60 * 25; meteors = [];
+    runStats = createRunStats();
     isTutorialMode = false;
     tutorialStep = 0;
     tutorialTimer = 0;
@@ -368,6 +402,98 @@ function setBossEffects(active) {
     }
 }
 function resetBossEffects() { setBossEffects(false); }
+
+function startEnvironmentEvent() {
+    if (isBossActive || isTutorialMode) return;
+    const roll = Math.random();
+    const type = roll < 0.4 ? 'meteor' : roll < 0.7 ? 'gravity' : 'repair';
+    currentEnvironment = {
+        type,
+        timer: type === 'repair' ? 60 * 10 : 60 * 12,
+        x: type === 'repair' ? 35 + Math.random() * (canvas.width - 70) : 0,
+        y: type === 'repair' ? 110 + Math.random() * 120 : 0,
+        drift: type === 'gravity' ? (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 0.8) : 0
+    };
+    meteors = [];
+}
+
+function updateEnvironmentEvent() {
+    if (!currentEnvironment && frameCount >= nextEnvironmentFrame && !isBossActive && !isTutorialMode) {
+        startEnvironmentEvent();
+    }
+    if (!currentEnvironment) return;
+
+    currentEnvironment.timer--;
+    if (currentEnvironment.type === 'gravity') {
+        input.x += currentEnvironment.drift;
+    } else if (currentEnvironment.type === 'repair') {
+        const dx = player.x - currentEnvironment.x;
+        const dy = player.y - currentEnvironment.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 28 && frameCount % 20 === 0) {
+            player.hp = Math.min(player.maxHp, player.hp + 2);
+            createParticles(player.x, player.y, '#0f0', 2);
+        }
+    } else if (currentEnvironment.type === 'meteor') {
+        if (frameCount % 14 === 0) {
+            meteors.push({
+                x: Math.random() * canvas.width,
+                y: -10,
+                vx: (Math.random() - 0.5) * 1.2,
+                vy: 3.5 + Math.random() * 1.8,
+                size: 5 + Math.random() * 5
+            });
+        }
+    }
+
+    for (let i = meteors.length - 1; i >= 0; i--) {
+        const m = meteors[i];
+        m.x += m.vx;
+        m.y += m.vy;
+        if (rectIntersect(player.x, player.y, 6, m.x, m.y, m.size, m.size)) {
+            applyPlayerDamage(10);
+            triggerScreenShake(6, 10);
+            triggerShockwave(m.x, m.y);
+            createParticles(m.x, m.y, '#f80', 10);
+            meteors.splice(i, 1);
+        } else if (m.y > canvas.height + 20) {
+            meteors.splice(i, 1);
+        }
+    }
+
+    if (currentEnvironment.timer <= 0 || isBossActive) {
+        currentEnvironment = null;
+        meteors = [];
+        nextEnvironmentFrame = frameCount + 60 * (22 + Math.random() * 16);
+    }
+}
+
+function drawEnvironmentEvent() {
+    if (!currentEnvironment) return;
+    if (currentEnvironment.type === 'gravity') {
+        ctx.fillStyle = 'rgba(255, 235, 59, 0.1)';
+        for (let y = 20; y < canvas.height; y += 24) {
+            const x = currentEnvironment.drift > 0 ? 8 : canvas.width - 8;
+            ctx.fillRect(x, y, currentEnvironment.drift > 0 ? 10 : -10, 2);
+        }
+    } else if (currentEnvironment.type === 'repair') {
+        ctx.strokeStyle = 'rgba(0, 255, 120, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(currentEnvironment.x, currentEnvironment.y, 28 + Math.sin(frameCount * 0.08) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0, 255, 120, 0.15)';
+        ctx.fillRect(currentEnvironment.x - 3, currentEnvironment.y - 12, 6, 24);
+        ctx.fillRect(currentEnvironment.x - 12, currentEnvironment.y - 3, 24, 6);
+    }
+
+    ctx.fillStyle = '#f80';
+    meteors.forEach(m => {
+        ctx.fillRect(m.x - m.size / 2, m.y - m.size / 2, m.size, m.size);
+        ctx.fillStyle = 'rgba(255, 235, 59, 0.7)';
+        ctx.fillRect(m.x - 1, m.y - m.size, 2, m.size);
+        ctx.fillStyle = '#f80';
+    });
+}
 
 
 function loop() {
@@ -424,6 +550,7 @@ function updateGameLogic() {
             input.y += gamepad.axes[1] * 5;
         }
     }
+    updateEnvironmentEvent();
 
     // Clamp input to screen
     input.x = Math.max(0, Math.min(canvas.width, input.x));
@@ -487,6 +614,7 @@ function updateGameLogic() {
         gameState = 'gameover';
         document.getElementById('finalScoreScore').innerText = "SCORE: " + score;
         document.getElementById('finalScoreBoss').innerText = "BOSS DEFEATED: " + bossDefeatedCount;
+        updateFinalResultDetails();
         
         // 復活ボタンの表示制御
         const reviveBtn = document.getElementById('reviveButton');
@@ -567,6 +695,7 @@ function drawGame() {
             ctx.fillRect(s.x, s.y, 1, 1);
         });
     }
+    drawEnvironmentEvent();
 
     // プレイヤー
     drawPlayer(player.x, player.y);
@@ -604,9 +733,12 @@ function drawGame() {
         if (!isBossActive && e.isCharger && e.chargeTimer > 0 && Math.floor(e.chargeTimer/10) % 2 === 0) {
              drawColor = '#fff'; // 点滅色
         }
+        if (e.enemyType === 'sniper' && e.aimTimer > 0 && Math.floor(e.aimTimer / 8) % 2 === 0) {
+            drawColor = '#fff';
+        }
 
         ctx.fillStyle = drawColor;
-        if (e.isRare) {
+        if (e.isRare || e.enemyType === 'guardian') {
             ctx.beginPath();
             ctx.arc(e.x, e.y, e.w/2, 0, Math.PI * 2);
             ctx.fill();
@@ -618,6 +750,33 @@ function drawGame() {
         ctx.fillStyle = isBossActive ? '#333' : '#000';
         ctx.fillRect(e.x - e.w/5, e.y - e.h/4, e.w/12, e.h/4);
         ctx.fillRect(e.x + e.w/12, e.y - e.h/4, e.w/12, e.h/4);
+        if (e.isBoss && e.bossName) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            if (e.bossType === 'laser') {
+                ctx.beginPath();
+                ctx.moveTo(e.x - e.w * 0.42, e.y);
+                ctx.lineTo(e.x + e.w * 0.42, e.y);
+                ctx.stroke();
+            } else if (e.bossType === 'summoner') {
+                for (let i = 0; i < 3; i++) {
+                    const a = frameCount * 0.04 + i * Math.PI * 2 / 3;
+                    ctx.fillRect(e.x + Math.cos(a) * e.w * 0.45 - 3, e.y + Math.sin(a) * e.h * 0.45 - 3, 6, 6);
+                }
+            } else if (e.bossType === 'storm') {
+                ctx.beginPath();
+                ctx.moveTo(e.x - e.w * 0.3, e.y - e.h * 0.3);
+                ctx.lineTo(e.x + e.w * 0.3, e.y + e.h * 0.3);
+                ctx.moveTo(e.x + e.w * 0.3, e.y - e.h * 0.3);
+                ctx.lineTo(e.x - e.w * 0.3, e.y + e.h * 0.3);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 8px "M PLUS 1 Code"';
+            ctx.textAlign = 'center';
+            ctx.fillText(e.bossName, e.x, e.y + e.h / 2 + 10);
+            ctx.textAlign = 'left';
+        }
 
         // レア敵（シルクハット）の追加装飾
         if (e.isRare) {
@@ -626,6 +785,26 @@ function drawGame() {
             ctx.fillRect(e.x - e.w * 0.7, e.y - e.h * 0.5, e.w * 1.4, e.h * 0.15);
             // 山
             ctx.fillRect(e.x - e.w * 0.4, e.y - e.h * 1.0, e.w * 0.8, e.h * 0.6);
+        }
+        if (e.enemyType === 'splitter') {
+            ctx.strokeStyle = isBossActive ? '#ccc' : '#ffeb3b';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(e.x - e.w/2 + 3, e.y - e.h/2 + 3, e.w - 6, e.h - 6);
+        }
+        if (e.enemyType === 'guardian') {
+            ctx.strokeStyle = isBossActive ? '#aaa' : '#0ff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, 38 + Math.sin(frameCount * 0.08) * 2, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        if (e.enemyType === 'sniper' && e.aimTimer > 0) {
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.lineTo(player.x, player.y);
+            ctx.strokeStyle = `rgba(255, 235, 59, ${0.15 + (60 - e.aimTimer) / 120})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
         }
         
         // --- タイミングコアの描画 ---
@@ -776,7 +955,8 @@ function updateEntities() {
         if (e.isBoss) {
             // ボスの動き：ゆっくり降りてきて左右に動く
             if (e.y < 60) e.y += 0.5 * slowFactor;
-            e.x += Math.sin(frameCount * 0.02) * 2 * slowFactor;
+            const bossMoveSpeed = e.bossType === 'laser' ? 1.2 : e.bossType === 'storm' ? 3 : 2;
+            e.x += Math.sin(frameCount * 0.02) * bossMoveSpeed * slowFactor;
 
             // 新しいオーラエフェクト
             if (frameCount % 4 === 0) { // 頻度を調整
@@ -850,23 +1030,24 @@ function updateEntities() {
             e.spiralAttack.timer -= slowFactor;
             if (e.spiralAttack.timer <= 0 && !e.spiralAttack.active) {
                 e.spiralAttack.active = true;
-                e.spiralAttack.timer = 180; // 3秒間攻撃
+                e.spiralAttack.timer = e.bossType === 'storm' ? 240 : 180; // 攻撃時間
             }
             if (e.spiralAttack.active) {
                 if (e.spiralAttack.timer <= 0) {
                     e.spiralAttack.active = false;
-                    e.spiralAttack.timer = 400; // 6.6秒クールダウン
+                    e.spiralAttack.timer = e.bossType === 'storm' ? 220 : 400; // クールダウン
                 } else {
-                    if (frameCount % 3 === 0) {
-                       const speed = 2.5;
-                       for(let i = 0; i < 2; i++) { // 2方向に出す
-                           const angle = e.spiralAttack.angle + Math.PI * i;
+                    if (frameCount % (e.bossType === 'storm' ? 2 : 3) === 0) {
+                       const speed = e.bossType === 'storm' ? 3 : 2.5;
+                       const spiralWays = e.bossType === 'storm' ? 4 : 2;
+                       for(let i = 0; i < spiralWays; i++) {
+                           const angle = e.spiralAttack.angle + (Math.PI * 2 / spiralWays) * i;
                            enemyBullets.push({ 
                                x: e.x, y: e.y, 
                                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed 
                            });
                        }
-                       e.spiralAttack.angle += 0.2; // 少しずつ角度をずらす
+                       e.spiralAttack.angle += e.bossType === 'storm' ? 0.28 : 0.2; // 少しずつ角度をずらす
                     }
                 }
             }
@@ -875,13 +1056,13 @@ function updateEntities() {
             e.laserTimer -= slowFactor;
             if (e.laserTimer <= 0 && e.laserState === 'idle') {
                 e.laserState = 'aiming';
-                e.laserTimer = 90; // 1.5秒エイミング
+                e.laserTimer = e.bossType === 'laser' ? 55 : 90; // エイミング
                 e.laserTargetX = player.x;
                 e.laserTargetY = player.y;
             } else if (e.laserState === 'aiming') {
                 if (e.laserTimer <= 0) {
                     e.laserState = 'firing';
-                    e.laserTimer = 120; // 2秒間発射
+                    e.laserTimer = e.bossType === 'laser' ? 155 : 120; // 発射
                 }
             } else if (e.laserState === 'firing') {
                 // レーザー発射中にパーティクルを発生させて迫力を出す
@@ -893,7 +1074,33 @@ function updateEntities() {
                 );
                 if (e.laserTimer <= 0) {
                     e.laserState = 'idle';
-                    e.laserTimer = 300; // 5秒クールダウン
+                    e.laserTimer = e.bossType === 'laser' ? 170 : 300; // クールダウン
+                }
+            }
+
+            if (e.summonAttack) {
+                e.summonAttack.timer -= slowFactor;
+                if (e.summonAttack.timer <= 0) {
+                    const summonCount = e.bossType === 'summoner' ? 4 : 1;
+                    for (let s = 0; s < summonCount; s++) {
+                        enemies.push({
+                            x: 20 + Math.random() * (canvas.width - 40), y: -15,
+                            w: 12, h: 12,
+                            hp: 12 * (1 + bossDefeatedCount * 0.2),
+                            speed: 1.2 + Math.random() * 0.6,
+                            sway: 1.5, offset: Math.random() * 100,
+                            fireRate: 999,
+                            baseColor: '#9cffd9',
+                            enemyType: 'fragment',
+                            isCharger: false,
+                            isRare: false,
+                            chargeTimer: 0,
+                            aimTimer: 0,
+                            isFragment: true
+                        });
+                    }
+                    createParticles(e.x, e.y, '#9cffd9', 12);
+                    e.summonAttack.timer = e.bossType === 'summoner' ? 170 : 520;
                 }
             }
 
@@ -902,7 +1109,7 @@ function updateEntities() {
             if (frameCount % effectiveBossFireRate === 0) {
                 createParticles(e.x, e.y, '#fff', 5); // 弾発射時にもエフェクト
                 // 放射状攻撃
-                const ways = 8 + bossDefeatedCount * 2;
+                const ways = (e.bossType === 'storm' ? 12 : 8) + bossDefeatedCount * 2;
                 for(let j=0; j<ways; j++) {
                     let angle = (Math.PI * 2 / ways) * j + frameCount*0.01;
                     enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*3, vy: Math.sin(angle)*3 });
@@ -913,6 +1120,19 @@ function updateEntities() {
                      enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*4, vy: Math.sin(angle)*4 });
                 }
             }
+        } else if (e.enemyType === 'sniper') {
+            e.y += e.y < 70 ? e.speed * slowFactor : Math.sin(frameCount * 0.05 + e.offset) * 0.3 * slowFactor;
+            e.aimTimer -= slowFactor;
+            if (e.aimTimer <= 0) {
+                const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle) * 5.2, vy: Math.sin(angle) * 5.2 });
+                createParticles(e.x, e.y, '#ffeb3b', 4);
+                e.aimTimer = Math.max(45, 95 - gameTimeDifficulty * 2);
+            }
+        } else if (e.enemyType === 'guardian') {
+            e.y += e.speed * 0.75 * slowFactor;
+            e.x += Math.sin(frameCount * 0.035 + e.offset) * e.sway * slowFactor;
+            if (frameCount % 35 === 0) createParticles(e.x, e.y, '#0ff', 2);
         } else if (e.isCharger) {
             // 反射神経要素：突撃タイプの敵
             if (e.chargeTimer > 0) {
@@ -965,6 +1185,9 @@ function checkCollisions() {
                 if (Math.random() < effectiveCritChance) {
                     finalDamage *= player.critDamage;
                     isCritical = true;
+                }
+                if (!e.isBoss && e.enemyType !== 'guardian' && isProtectedByGuardian(e)) {
+                    finalDamage *= 0.45;
                 }
                 e.hp -= finalDamage;
 
@@ -1076,11 +1299,7 @@ function checkCollisions() {
         }
     }
 
-    if (hit && player.invincibilityTimer <= 0) {
-        player.hp -= isBossActive ? 15 : 5; // ボス戦中は被ダメUP
-        createParticles(player.x, player.y, '#f00', 5);
-        if (player.hp < 0) player.hp = 0;
-    }
+    if (hit) applyPlayerDamage(isBossActive ? 15 : 5); // ボス戦中は被ダメUP
 
     xpGems.forEach((g, i) => {
         if (rectIntersect(player.x, player.y, 20, g.x, g.y, 4, 4)) {
@@ -1093,6 +1312,24 @@ function checkCollisions() {
 function rectIntersect(x1, y1, s1, x2, y2, w2, h2) {
     return x2 - w2/2 < x1 + s1/2 && x2 + w2/2 > x1 - s1/2 &&
            y2 - h2/2 < y1 + s1/2 && y2 + h2/2 > y1 - s1/2;
+}
+
+function applyPlayerDamage(amount) {
+    if (player.invincibilityTimer > 0) return;
+    player.hp -= amount;
+    runStats.damageTaken += amount;
+    createParticles(player.x, player.y, '#f00', 5);
+    if (player.hp < 0) player.hp = 0;
+    player.invincibilityTimer = Math.max(player.invincibilityTimer, 20);
+}
+
+function isProtectedByGuardian(target) {
+    return enemies.some(e => {
+        if (e.dead || e.enemyType !== 'guardian') return false;
+        const dx = target.x - e.x;
+        const dy = target.y - e.y;
+        return Math.sqrt(dx * dx + dy * dy) < 42;
+    });
 }
 
 function spawnPlayerBullets() {
@@ -1154,6 +1391,7 @@ function spawnBoss() {
     enemies = []; enemyBullets = [];
 
     const powerLevel = calculatePlayerPowerLevel();
+    const bossInfo = bossTypes[bossDefeatedCount % bossTypes.length];
     // プレイヤーのパワーレベルに基づいてボスを強化
     // 最低限の強さは保証しつつ、青天井に強くなるように調整. 係数を増やしてよりチャレンジングに
     const hpMultiplier = 1 + (bossDefeatedCount * 0.2) + powerLevel * 0.6;
@@ -1164,33 +1402,38 @@ function spawnBoss() {
         x: canvas.width / 2, y: -50,
         w: Math.min(120, 50 * sizeMultiplier), // サイズ上限
         h: Math.min(120, 50 * sizeMultiplier),
-        hp: 1500 * hpMultiplier,
-        fireRate: Math.max(5, 30 / attackMultiplier), // 連射速度上限
-        baseColor: '#fff', // ボスは白ベース
+        hp: 1500 * hpMultiplier * (bossInfo.id === 'summoner' ? 0.85 : 1),
+        fireRate: Math.max(5, (bossInfo.id === 'storm' ? 22 : 30) / attackMultiplier), // 連射速度上限
+        baseColor: bossInfo.color,
         isBoss: true,
+        bossType: bossInfo.id,
+        bossName: bossInfo.name,
 
        timingCore: {
             state: 'inactive', // 'inactive', 'charging', 'active', 'cooldown'
-            timer: 180, // 次のアクションまでの時間
+            timer: bossInfo.id === 'core' ? 130 : 200, // 次のアクションまでの時間
             x: canvas.width / 2, // 初期位置
             y: 100,
-            radius: 15
+            radius: bossInfo.id === 'core' ? 18 : 14
         },
         // レーザー攻撃用のプロパティ
         laserState: 'idle', // 'idle', 'aiming', 'firing'
-        laserTimer: 240,
+        laserTimer: bossInfo.id === 'laser' ? 120 : 240,
         laserTargetX: 0,
         laserTargetY: 0,
         // 新しいスパイラル攻撃用のプロパティ
         spiralAttack: {
-            timer: 150, // 開始までの時間
+            timer: bossInfo.id === 'storm' ? 70 : 150, // 開始までの時間
             angle: 0,
             active: false
+        },
+        summonAttack: {
+            timer: bossInfo.id === 'summoner' ? 150 : 420
         },
         // Quick Tap (QTE) 用のプロパティ
         quickTap: {
             state: 'inactive', // 'inactive', 'active', 'cooldown'
-            timer: 300 + Math.random() * 300,
+            timer: bossInfo.id === 'core' ? 220 + Math.random() * 220 : 360 + Math.random() * 300,
             x: 0,
             y: 0,
             radius: 40
@@ -1204,6 +1447,17 @@ function spawnEnemy() {
     const isCharger = Math.random() < 0.1 + (gameTimeDifficulty * 0.005);
     // 3%の確率でレア敵（シルクハット）をスポーン (突撃タイプではない場合)
     const isRare = !isCharger && Math.random() < 0.03;
+    const specialRoll = Math.random();
+    let enemyType = isCharger ? 'charger' : 'normal';
+    if (!isCharger && !isRare && gameTimeDifficulty >= 2) {
+        if (specialRoll < Math.min(0.11, 0.04 + gameTimeDifficulty * 0.004)) {
+            enemyType = 'sniper';
+        } else if (specialRoll < Math.min(0.22, 0.09 + gameTimeDifficulty * 0.006)) {
+            enemyType = 'splitter';
+        } else if (specialRoll < Math.min(0.29, 0.12 + gameTimeDifficulty * 0.005)) {
+            enemyType = 'guardian';
+        }
+    }
     
     let w = 16 + Math.random()*10;
     let h = 16 + Math.random()*10;
@@ -1215,6 +1469,19 @@ function spawnEnemy() {
         hp = 100 * diff; // HP多め
         baseColor = '#AA00AA';
     }
+    if (enemyType === 'sniper') {
+        w = 14; h = 22;
+        hp = 18 * diff;
+        baseColor = '#ffeb3b';
+    } else if (enemyType === 'splitter') {
+        w = 24; h = 18;
+        hp = 26 * diff;
+        baseColor = '#00e676';
+    } else if (enemyType === 'guardian') {
+        w = 22; h = 22;
+        hp = 45 * diff;
+        baseColor = '#00bcd4';
+    }
 
     enemies.push({
         x: Math.random() * (canvas.width - 20) + 10, y: -20,
@@ -1224,15 +1491,21 @@ function spawnEnemy() {
         sway: Math.random() * 2, offset: Math.random() * 100,
         fireRate: Math.max(30, 120 - gameTimeDifficulty),
         baseColor: baseColor,
+        enemyType: isRare ? 'rare' : enemyType,
         isCharger: isCharger,
         isRare: isRare,
-        chargeTimer: isCharger ? 90 : 0 // 90フレーム(1.5秒)溜める
+        chargeTimer: isCharger ? 90 : 0, // 90フレーム(1.5秒)溜める
+        aimTimer: enemyType === 'sniper' ? 70 : 0,
+        isFragment: false
     });
 }
 
 function killEnemy(e) {
     if (e.dead) return;
     e.dead = true;
+    const killedType = e.isBoss ? (e.bossType || 'core') : (e.enemyType || 'normal');
+    runStats.enemiesKilled++;
+    runStats.enemiesByType[killedType] = (runStats.enemiesByType[killedType] || 0) + 1;
     
     if (player.doctrine === 'heal') {
         player.doctrineKillCount++;
@@ -1253,6 +1526,7 @@ function killEnemy(e) {
         // ボス撃破時処理
         isBossActive = false;
         bossDefeatedCount++;
+        runStats.bossesByType[e.bossType || 'core'] = (runStats.bossesByType[e.bossType || 'core'] || 0) + 1;
         timeToNextBoss = 60 * 60; // タイマーリセット
         setBossEffects(false); // 色を戻す
         // 大量のXP
@@ -1260,6 +1534,26 @@ function killEnemy(e) {
         score += 5000 * (bossDefeatedCount + 1);
         createParticles(e.x, e.y, '#fff', 50); // 派手な爆発
     } else {
+        if (e.enemyType === 'splitter' && !e.isFragment) {
+            for (let i = 0; i < 2; i++) {
+                enemies.push({
+                    x: e.x + (i === 0 ? -8 : 8), y: e.y,
+                    w: 10, h: 10,
+                    hp: Math.max(4, 8 * (1 + gameTimeDifficulty * 0.08)),
+                    speed: 1.7 + Math.random(),
+                    sway: 1.2, offset: Math.random() * 100,
+                    fireRate: 999,
+                    baseColor: '#69f0ae',
+                    enemyType: 'fragment',
+                    isCharger: false,
+                    isRare: false,
+                    chargeTimer: 0,
+                    aimTimer: 0,
+                    isFragment: true
+                });
+            }
+            triggerShockwave(e.x, e.y);
+        }
         createParticles(e.x, e.y, isBossActive ? '#fff' : e.baseColor, 10);
         score += 100;
         xpGems.push({ x: e.x, y: e.y, val: 5 + (gameTimeDifficulty * 0.8) });
@@ -1280,9 +1574,51 @@ function addXp(amount) {
     if (player.xp >= player.nextLevelXp) {
         player.xp -= player.nextLevelXp;
         player.level++;
+        runStats.maxLevel = Math.max(runStats.maxLevel, player.level);
         player.nextLevelXp = Math.floor(player.nextLevelXp * 1.25 + 20);
         showUpgradeMenu();
     }
+}
+
+function formatRunTime(frames) {
+    const totalSeconds = Math.floor(frames / 60);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function getTopEnemyType() {
+    let topType = '-';
+    let topCount = 0;
+    Object.keys(runStats.enemiesByType).forEach(type => {
+        if (type === 'core' || type === 'laser' || type === 'summoner' || type === 'storm') return;
+        if (runStats.enemiesByType[type] > topCount) {
+            topType = enemyTypes[type] || type.toUpperCase();
+            topCount = runStats.enemiesByType[type];
+        }
+    });
+    return topCount > 0 ? `${topType} x${topCount}` : '-';
+}
+
+function updateFinalResultDetails() {
+    const details = document.getElementById('finalResultDetails');
+    const bossNames = {};
+    bossTypes.forEach(b => { bossNames[b.id] = b.name; });
+    const defeatedBosses = Object.keys(runStats.bossesByType)
+        .map(type => `${bossNames[type] || type}: ${runStats.bossesByType[type]}`)
+        .join(' / ') || '-';
+    const rows = [
+        ['SURVIVAL', formatRunTime(frameCount - runStartFrame)],
+        ['MAX LV', runStats.maxLevel],
+        ['UPGRADES', runStats.upgradesChosen],
+        ['KILLS', Math.max(0, runStats.enemiesKilled - bossDefeatedCount)],
+        ['TOP TARGET', getTopEnemyType()],
+        ['DAMAGE TAKEN', Math.floor(runStats.damageTaken)],
+        ['BOSS TYPES', defeatedBosses]
+    ];
+    details.innerHTML = rows.map(([label, value]) =>
+        `<div class="result-row"><span class="result-label">${label}</span><span>${value}</span></div>`
+    ).join('');
 }
 
 function showUpgradeMenu() {
@@ -1306,6 +1642,7 @@ function showUpgradeMenu() {
         card.onclick = () => {
             upg.apply();
             player.acquiredUpgrades.push(upg);
+            runStats.upgradesChosen++;
             menu.style.display = 'none';
             gameState = 'playing';
             loop();
@@ -1498,6 +1835,13 @@ function updateUI() {
     const secondsToBoss = Math.max(0, Math.ceil(timeToNextBoss / 60));
     document.getElementById('bossTimerDisplay').innerText = isBossActive ? "BOSS FIGHT!" : `NEXT BOSS: ${secondsToBoss}`;
     document.getElementById('bossTimerDisplay').style.color = (timeToNextBoss < 180 && !isBossActive) ? '#f00' : '#fff';
+    const eventDisplay = document.getElementById('eventDisplay');
+    if (currentEnvironment) {
+        const eventNames = { meteor: 'METEOR SHOWER', gravity: 'GRAVITY SHIFT', repair: 'REPAIR FIELD' };
+        eventDisplay.innerText = `${eventNames[currentEnvironment.type]}: ${Math.ceil(currentEnvironment.timer / 60)}`;
+    } else {
+        eventDisplay.innerText = '';
+    }
 }
 
 // --- 音量管理 ---

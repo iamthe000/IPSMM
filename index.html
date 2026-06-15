@@ -31,6 +31,7 @@
             <button id="pauseButton" style="padding: 5px 10px; font-size: 12px; pointer-events: auto;" onclick="togglePause()">PAUSE</button>
         </div>
         <div class="stat" style="text-align:center" id="bossTimerDisplay">NEXT BOSS: 60</div>
+        <div class="stat" style="text-align:center" id="eventDisplay"></div>
     </div>
 
     <div id="startMenu" style="display:flex;">
@@ -87,7 +88,8 @@
         <div id="gameOverDefault">
             <h1 style="color:#f00">GAME OVER</h1>
             <p id="finalScoreScore" style="margin-bottom:10px;">SCORE: 0</p>
-            <p id="finalScoreBoss" style="color:#aaa; margin-bottom:20px;">BOSS DEFEATED: 0</p>
+            <p id="finalScoreBoss" style="color:#aaa; margin-bottom:10px;">BOSS DEFEATED: 0</p>
+            <div id="finalResultDetails"></div>
             <button onclick="resetGame()">RESTART</button>
             <br>
             <button id="reviveButton" onclick="showReviveConfirm()" style="display:none; margin-top: 10px; background: #ffeb3b;">REVIVAL</button>
