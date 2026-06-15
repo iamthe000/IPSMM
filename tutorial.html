@@ -56,12 +56,43 @@
             align-items: center;
             margin-bottom: 15px;
         }
+        .enemy-entry p {
+            margin: 0;
+        }
         .enemy-canvas {
             width: 50px;
             height: 50px;
             border: 1px solid #444;
             margin-right: 15px;
             flex-shrink: 0;
+        }
+        .enemy-swatch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .enemy-swatch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #333;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .enemy-swatch p {
+            margin: 0;
+            font-size: 11px;
+            line-height: 1.45;
+            color: #ccc;
+        }
+        .enemy-swatch strong {
+            color: #fff;
+        }
+        .enemy-canvas--wide {
+            width: 56px;
+            height: 56px;
         }
     </style>
 </head>
@@ -79,23 +110,48 @@
             </p>
 
             <h3>敵について</h3>
-            <div class="enemy-entry">
-                <canvas id="normalEnemyCanvas" class="enemy-canvas" width="50" height="50"></canvas>
-                <p><strong>ガンナー:</strong> ゆっくりと移動し、単発の弾を発射します。</p>
+            <div class="enemy-swatch-grid">
+                <div class="enemy-swatch">
+                    <canvas id="normalEnemyCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>ガンナー:</strong> 基本の雑魚。ゆっくり降りながら単発弾を撃ちます。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="chargerEnemyCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>チャージャー:</strong> 赤色。少し溜めてから高速突進します。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="sniperEnemyCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>スナイパー:</strong> 黄色の照準線のあと、高速弾を撃ちます。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="splitterEnemyCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>スプリッター:</strong> 倒すと小型の破片に分裂します。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="guardianEnemyCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>ガーディアン:</strong> 周囲の敵を守る防御役。先に落とすと崩しやすいです。</p>
+                </div>
             </div>
-            <div class="enemy-entry">
-                <canvas id="chargerEnemyCanvas" class="enemy-canvas" width="50" height="50"></canvas>
-                <p><strong>チャージャー (赤色):</strong> 短い溜めの後、高速で突撃してきます。素早く破壊しましょう！</p>
+
+            <h3>ボスの種類</h3>
+            <div class="enemy-swatch-grid">
+                <div class="enemy-swatch">
+                    <canvas id="bossCoreCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>TIMING CORE:</strong> タイミングコアが主軸。白く光る瞬間を狙います。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="bossLaserCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>LASER DREADNOUGHT:</strong> 強いレーザーで軸移動を迫る型です。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="bossSummonerCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>VOID SUMMONER:</strong> 小型の増援を呼び、場をじわじわ圧迫します。</p>
+                </div>
+                <div class="enemy-swatch">
+                    <canvas id="bossStormCanvas" class="enemy-canvas enemy-canvas--wide" width="56" height="56"></canvas>
+                    <p><strong>SPIRAL STORM:</strong> 弾幕の密度が高く、移動の余白が減ります。</p>
+                </div>
             </div>
-            <div class="enemy-entry">
-                <canvas id="bossEnemyCanvas" class="enemy-canvas" width="50" height="50"></canvas>
-                <p><strong>ボス:</strong> 60秒ごとに出現する強力な敵。多彩な攻撃パターンと高い体力を持ちます。倒すと高得点と大量のXPが得られます。</p>
-            </div>
-            <p>
-                <strong>スナイパー:</strong> 黄色い照準線の後に高速弾を放ちます。線が見えたら軸をずらしましょう。<br>
-                <strong>スプリッター:</strong> 倒すと小型の破片に分裂します。範囲攻撃や貫通が有効です。<br>
-                <strong>ガーディアン:</strong> 周囲の敵を防御フィールドで守ります。先に撃破すると群れを崩しやすくなります。
-            </p>
 
             <h3>環境イベント</h3>
             <p>
@@ -108,9 +164,6 @@
             <h3>ボスの特殊ギミック</h3>
             <p>
                 ボス戦では、特定のタイミングで発生するギミックを活用することで大ダメージを与えられます。
-            </p>
-            <p>
-                ボスには複数の型があり、<strong>TIMING CORE</strong>、<strong>LASER DREADNOUGHT</strong>、<strong>VOID SUMMONER</strong>、<strong>SPIRAL STORM</strong>が順番に出現します。それぞれ得意な攻撃が違うため、毎回同じ避け方では押し切られます。
             </p>
             <p>
                 <strong>タイミングコア:</strong> ボスの体に現れる円形のエフェクトが白く光った瞬間に、タップ（または自機を重ねる）するとカウンターが成立し、大ダメージを与えられます。失敗すると強力な反撃を受けるため注意が必要です。
@@ -192,33 +245,111 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            let baseColor;
+            const drawFace = () => {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x - w/4, y - h/4, w/8, h/8);
+                ctx.fillRect(x + w/8, y - h/4, w/8, h/8);
+            };
+
             switch (enemyType) {
                 case 'charger':
-                    baseColor = '#f00';
+                    ctx.fillStyle = '#f00';
+                    ctx.fillRect(x - w/2, y - h/2, w, h);
+                    drawFace();
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(x - w/2, y - 2, 6, 4);
                     break;
-                case 'boss':
-                    baseColor = '#fff';
+                case 'sniper':
+                    ctx.fillStyle = '#ffeb3b';
+                    ctx.fillRect(x - 10, y - 14, 20, 28);
+                    ctx.strokeStyle = '#ffeb3b';
+                    ctx.beginPath();
+                    ctx.moveTo(x - 18, y);
+                    ctx.lineTo(x + 18, y);
+                    ctx.stroke();
+                    drawFace();
+                    break;
+                case 'splitter':
+                    ctx.fillStyle = '#00e676';
+                    ctx.fillRect(x - 12, y - 10, 24, 20);
+                    ctx.strokeStyle = '#9cffd9';
+                    ctx.strokeRect(x - 9, y - 7, 18, 14);
+                    drawFace();
+                    break;
+                case 'guardian':
+                    ctx.fillStyle = '#00bcd4';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 13, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#0ff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 19, 0, Math.PI * 2);
+                    ctx.stroke();
+                    drawFace();
+                    break;
+                case 'boss-core':
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(x - 15, y - 15, 30, 30);
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 18, 0, Math.PI * 2);
+                    ctx.stroke();
+                    break;
+                case 'boss-laser':
+                    ctx.fillStyle = '#ffe066';
+                    ctx.fillRect(x - 18, y - 14, 36, 28);
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x - 20, y);
+                    ctx.lineTo(x + 20, y);
+                    ctx.stroke();
+                    drawFace();
+                    break;
+                case 'boss-summoner':
+                    ctx.fillStyle = '#9cffd9';
+                    ctx.fillRect(x - 13, y - 13, 26, 26);
+                    ctx.fillStyle = '#fff';
+                    for (let i = 0; i < 3; i++) {
+                        const a = i * Math.PI * 2 / 3;
+                        ctx.fillRect(x + Math.cos(a) * 18 - 2, y + Math.sin(a) * 18 - 2, 4, 4);
+                    }
+                    drawFace();
+                    break;
+                case 'boss-storm':
+                    ctx.fillStyle = '#ff9cf3';
+                    ctx.fillRect(x - 14, y - 14, 28, 28);
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x - 18, y - 18);
+                    ctx.lineTo(x + 18, y + 18);
+                    ctx.moveTo(x + 18, y - 18);
+                    ctx.lineTo(x - 18, y + 18);
+                    ctx.stroke();
+                    drawFace();
                     break;
                 case 'normal':
                 default:
-                    baseColor = `hsl(180, 70%, 50%)`;
+                    ctx.fillStyle = 'hsl(180, 70%, 50%)';
+                    ctx.fillRect(x - w/2, y - h/2, w, h);
+                    drawFace();
                     break;
             }
-
-            ctx.fillStyle = baseColor;
-            ctx.fillRect(x - w/2, y - h/2, w, h);
-
-            // Face
-            ctx.fillStyle = '#000';
-            ctx.fillRect(x - w/4, y - h/4, w/8, h/8);
-            ctx.fillRect(x + w/8, y - h/4, w/8, h/8);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             drawEnemy('normalEnemyCanvas', 'normal');
             drawEnemy('chargerEnemyCanvas', 'charger');
-            drawEnemy('bossEnemyCanvas', 'boss');
+            drawEnemy('sniperEnemyCanvas', 'sniper');
+            drawEnemy('splitterEnemyCanvas', 'splitter');
+            drawEnemy('guardianEnemyCanvas', 'guardian');
+            drawEnemy('bossCoreCanvas', 'boss-core');
+            drawEnemy('bossLaserCanvas', 'boss-laser');
+            drawEnemy('bossSummonerCanvas', 'boss-summoner');
+            drawEnemy('bossStormCanvas', 'boss-storm');
         });
     </script>
 </body>
